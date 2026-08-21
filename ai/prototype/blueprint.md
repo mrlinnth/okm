@@ -40,7 +40,7 @@ Generated: 2026-08-21
 - Two sample servers, consistent with the Subscriptions screen: Contabo SG (5 subs) and Azure SG (3 subs)
 **Interactions:**
 - Add server → modal (label, optional public host, server JSON textarea) → Save adds the card and opens an Import success panel reporting how many existing keys were imported as subscriptions (mocked as 4)
-- Sync now → modal comparing live server keys vs ledger records, two sections: "Found on server, not in ledger" (Import action per item) and "In ledger, missing on server" (Remove record action per item); shows "Everything's in sync" when both are empty; resolved items flip their button label and turn green
+- Sync now → modal comparing live server keys vs ledger records, two sections: "Found on server, not in ledger" (with an optional textarea to paste `key_name: date` lines — Import uses the matching date if present, otherwise falls back to a default term; resolved rows show which expiry was actually applied) and "In ledger, missing on server" (Remove record action per item); shows "Everything's in sync" when both are empty; resolved items flip their button label and turn green
 - Migrate → modal, pick an active destination server (source excluded) → moves the subscription count over, zeroes out the source
 - Activate/Deactivate → immediate toggle, no confirmation
 - Delete → disabled with a tooltip while the server has subscriptions; no working delete path in this screen since neither sample server reaches zero subscriptions

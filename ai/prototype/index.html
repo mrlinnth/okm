@@ -489,6 +489,17 @@
               },
             },
             syncTarget: null,
+            expiryListInput: '',
+            parseExpiryList() {
+              const map = {};
+              this.expiryListInput.split('\n').forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const parts = trimmed.split(/[:\s→]+/).filter(Boolean);
+                if (parts.length >= 2) map[parts[0]] = parts[1];
+              });
+              return map;
+            },
             migrateSource: null,
             migrateDest: '',
             toggleStatus(srv) { srv.status = srv.status === 'active' ? 'inactive' : 'active' },
@@ -611,14 +622,20 @@
                 <div class="mt-4 space-y-4">
                   <div x-show="syncData[syncTarget.id].foundOnServer.length > 0">
                     <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Found on server, not in ledger</p>
+
+                    <div class="mt-2">
+                      <label class="block text-xs text-slate-400 mb-1">Optional: paste expiry dates (one per line, e.g. <span class="font-mono">hteik_new: 2026-10-01</span>) — otherwise a default term is used</label>
+                      <textarea x-model="expiryListInput" rows="2" placeholder="key_name: YYYY-MM-DD" class="w-full rounded-md border border-slate-200 py-1.5 px-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+                    </div>
+
                     <template x-for="item in syncData[syncTarget.id].foundOnServer" :key="item.keyName">
                       <div class="mt-2 flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
                         <div>
                           <p class="text-sm font-medium text-slate-800" x-text="item.keyName"></p>
-                          <p class="text-xs text-slate-400" x-text="item.note"></p>
+                          <p class="text-xs text-slate-400" x-text="item.resolved ? ('Imported — expiry: ' + (item.expiry || 'default term used')) : item.note"></p>
                         </div>
                         <button
-                          @click="item.resolved = true"
+                          @click="item.expiry = parseExpiryList()[item.keyName] || null; item.resolved = true"
                           :disabled="item.resolved"
                           :class="item.resolved ? 'text-emerald-600' : 'text-slate-700 hover:underline'"
                           class="shrink-0 text-xs font-medium"
