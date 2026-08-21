@@ -1,0 +1,32 @@
+{
+  "name": "ci4-cockpit-starter",
+  "version": "1.0.0",
+  "description": "A modern starter template integrating **CodeIgniter 4**, **BladeOne templating**, and **Cockpit CMS** as a headless content management system.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {
+    "daisyui": "^5.5.14",
+    "tailwindcss": "^4.1.18"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i ./public/css/input.css -o ./public/css/output.css",
+    "watch:css": "tailwindcss -i ./public/css/input.css -o ./public/css/output.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrlinnth/ci4-cockpit-starter.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mrlinnth/ci4-cockpit-starter/issues"
+  },
+  "homepage": "https://github.com/mrlinnth/ci4-cockpit-starter#readme",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.18"
+  }
+}

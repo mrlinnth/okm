@@ -1,0 +1,64 @@
+{
+    // Intelephense configuration for CodeIgniter 4
+    "intelephense.environment.includePaths": [
+        "${workspaceFolder}/vendor/codeigniter4/framework/system"
+    ],
+
+    // Enable stub support
+    "intelephense.stubs": [
+        "apache",
+        "bcmath",
+        "Core",
+        "curl",
+        "date",
+        "dom",
+        "fileinfo",
+        "filter",
+        "ftp",
+        "gd",
+        "hash",
+        "iconv",
+        "intl",
+        "json",
+        "libxml",
+        "mbstring",
+        "mysqli",
+        "openssl",
+        "pcre",
+        "PDO",
+        "pdo_mysql",
+        "Phar",
+        "SimpleXML",
+        "sockets",
+        "sodium",
+        "SPL",
+        "standard",
+        "tokenizer",
+        "xml",
+        "xmlreader",
+        "xmlwriter",
+        "zip",
+        "zlib"
+    ],
+
+    // File associations
+    "intelephense.files.associations": [
+        "*.php"
+    ],
+
+    // Disable basic PHP suggestions in favor of Intelephense
+    "php.suggest.basic": false,
+
+    // Files to exclude from Intelephense indexing
+    "intelephense.files.exclude": [
+        "**/.git/**",
+        "**/.svn/**",
+        "**/.hg/**",
+        "**/CVS/**",
+        "**/.DS_Store/**",
+        "**/node_modules/**",
+        "**/bower_components/**",
+        "**/vendor/**/Tests/**",
+        "**/vendor/**/tests/**"
+    ]
+}
