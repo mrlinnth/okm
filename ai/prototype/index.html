@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outline Key Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+</head>
+<body
+  x-data="{ page: 'subscriptions', mobileNavOpen: false }"
+  x-cloak
+  class="bg-slate-50 text-slate-900 antialiased"
+>
+
+  <!-- ============ ADMIN SHELL (all screens except recipient) ============ -->
+  <div x-show="page !== 'recipient'" class="min-h-screen flex">
+
+    <!-- Desktop sidebar -->
+    <aside class="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 border-r border-slate-200 bg-white">
+      <div class="h-16 flex items-center px-6 border-b border-slate-200">
+        <span class="text-lg font-semibold tracking-tight">OKM</span>
+      </div>
+      <nav class="flex-1 px-3 py-4 space-y-1">
+        <button
+          @click="page = 'subscriptions'"
+          :class="page === 'subscriptions' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          class="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+        >Subscriptions</button>
+        <button
+          @click="page = 'servers'"
+          :class="page === 'servers' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          class="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+        >Saved Servers</button>
+        <button
+          @click="page = 'classic'"
+          :class="page === 'classic' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          class="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+        >Classic Manager</button>
+      </nav>
+      <div class="px-3 py-4 border-t border-slate-200">
+        <button
+          @click="page = 'recipient'"
+          class="w-full text-left px-3 py-2 rounded-md text-xs font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+        >Preview recipient page →</button>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Mobile top nav -->
+      <header class="lg:hidden h-14 flex items-center justify-between px-4 border-b border-slate-200 bg-white sticky top-0 z-20">
+        <span class="text-base font-semibold tracking-tight">OKM</span>
+        <button @click="mobileNavOpen = true" class="p-2 -mr-2 text-slate-600" aria-label="Open menu">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </header>
+
+      <!-- Mobile drawer -->
+      <div x-show="mobileNavOpen" x-cloak class="lg:hidden fixed inset-0 z-30">
+        <div @click="mobileNavOpen = false" class="absolute inset-0 bg-black/30"></div>
+        <div class="absolute top-0 right-0 h-full w-64 bg-white shadow-xl flex flex-col">
+          <div class="h-14 flex items-center justify-between px-4 border-b border-slate-200">
+            <span class="text-sm font-semibold">Menu</span>
+            <button @click="mobileNavOpen = false" class="p-2 -mr-2 text-slate-500" aria-label="Close menu">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <nav class="flex-1 px-3 py-4 space-y-1">
+            <button
+              @click="page = 'subscriptions'; mobileNavOpen = false"
+              :class="page === 'subscriptions' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+              class="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >Subscriptions</button>
+            <button
+              @click="page = 'servers'; mobileNavOpen = false"
+              :class="page === 'servers' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+              class="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >Saved Servers</button>
+            <button
+              @click="page = 'classic'; mobileNavOpen = false"
+              :class="page === 'classic' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+              class="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >Classic Manager</button>
+            <div class="pt-3 mt-3 border-t border-slate-200">
+              <button
+                @click="page = 'recipient'; mobileNavOpen = false"
+                class="w-full text-left px-3 py-2 rounded-md text-xs font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >Preview recipient page →</button>
+            </div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Screen content -->
+      <main class="flex-1 p-6 lg:p-10">
+
+        <div
+          x-show="page === 'subscriptions'"
+          x-data="{
+            search: '',
+            statusFilter: 'all',
+            serverFilter: 'all',
+            expiringOnly: false,
+            copiedId: null,
+            rerolledId: null,
+            menuOpenId: null,
+            showCreate: false,
+            showSuccess: false,
+            successSub: null,
+            deleteTarget: null,
+            editingExpiryId: null,
+            moveTarget: null,
+            moveServer: '',
+            today: '2026-08-21',
+            newSub: { recipient: '', keyName: '', server: 'Contabo SG', duration: '1' },
+            servers: ['Contabo SG', 'Azure SG'],
+            subs: [
+              { id: 1, recipient: 'Aung Ko', keyName: 'aungko_phone', server: 'Contabo SG', status: 'active', expiryDate: '2026-09-15' },
+              { id: 2, recipient: 'Su Su Hlaing', keyName: 'susu_laptop', server: 'Contabo SG', status: 'active', expiryDate: '2026-08-25' },
+              { id: 3, recipient: 'Min Thu', keyName: 'minthu_tablet', server: 'Azure SG', status: 'disabled', expiryDate: '2026-07-10' },
+              { id: 4, recipient: 'Hla Hla Win', keyName: 'hlahla_phone', server: 'Contabo SG', status: 'expired', expiryDate: '2026-08-01' },
+              { id: 5, recipient: 'Zaw Zaw', keyName: 'zawzaw_desktop', server: 'Contabo SG', status: 'active', expiryDate: '2026-10-02' },
+              { id: 6, recipient: 'Nilar', keyName: 'nilar_phone2', server: 'Azure SG', status: 'active', expiryDate: '2026-08-27' },
+              { id: 7, recipient: 'Kyaw Kyaw', keyName: 'kyawkyaw_main', server: 'Contabo SG', status: 'disabled', expiryDate: '2026-06-20' },
+              { id: 8, recipient: 'Thida', keyName: 'thida_home', server: 'Azure SG', status: 'active', expiryDate: '2026-11-11' },
+            ],
+            nextId: 9,
+            formatDate(iso) {
+              if (!iso) return '';
+              const d = new Date(iso + 'T00:00:00');
+              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            },
+            addMonths(iso, n) {
+              const d = new Date(iso + 'T00:00:00');
+              d.setMonth(d.getMonth() + n);
+              return d.toISOString().slice(0, 10);
+            },
+            isExpiringSoon(sub) {
+              if (sub.status !== 'active') return false;
+              const diffDays = (new Date(sub.expiryDate + 'T00:00:00') - new Date(this.today + 'T00:00:00')) / 86400000;
+              return diffDays >= 0 && diffDays <= 7;
+            },
+            filtered() {
+              return this.subs.filter(s => {
+                if (this.search && !s.recipient.toLowerCase().includes(this.search.toLowerCase())) return false;
+                if (this.statusFilter !== 'all' && s.status !== this.statusFilter) return false;
+                if (this.serverFilter !== 'all' && s.server !== this.serverFilter) return false;
+                if (this.expiringOnly && !this.isExpiringSoon(s)) return false;
+                return true;
+              });
+            },
+            badgeClass(status) {
+              return {
+                active: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+                disabled: 'bg-slate-100 text-slate-600 ring-1 ring-slate-500/20',
+                expired: 'bg-rose-50 text-rose-700 ring-1 ring-rose-600/20',
+              }[status];
+            },
+            copy(sub) { this.copiedId = sub.id; this.menuOpenId = null; setTimeout(() => { this.copiedId = null }, 1500) },
+            reroll(sub) { this.rerolledId = sub.id; this.menuOpenId = null; setTimeout(() => { this.rerolledId = null }, 1800) },
+            toggleStatus(sub) { sub.status = sub.status === 'active' ? 'disabled' : 'active'; this.menuOpenId = null },
+            confirmDelete() { this.subs = this.subs.filter(s => s.id !== this.deleteTarget.id); this.deleteTarget = null },
+            extend(sub) { sub.expiryDate = this.addMonths(sub.expiryDate > this.today ? sub.expiryDate : this.today, 1); this.menuOpenId = null },
+            confirmMove() { this.moveTarget.server = this.moveServer; this.moveTarget = null; this.moveServer = '' },
+            createSub() {
+              const sub = {
+                id: this.nextId++,
+                recipient: this.newSub.recipient || 'New recipient',
+                keyName: this.newSub.keyName || 'new_key',
+                server: this.newSub.server,
+                status: 'active',
+                expiryDate: this.addMonths(this.today, parseInt(this.newSub.duration)),
+              };
+              this.subs.unshift(sub);
+              this.successSub = sub;
+              this.showCreate = false;
+              this.showSuccess = true;
+              this.newSub = { recipient: '', keyName: '', server: 'Contabo SG', duration: '1' };
+            }
+          }"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h1 class="text-2xl font-semibold tracking-tight">Subscriptions</h1>
+              <p class="mt-1 text-sm text-slate-500">Search, filter, and manage every recipient's key from one row.</p>
+            </div>
+            <button
+              @click="showCreate = true"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+              <span class="hidden sm:inline">New subscription</span>
+            </button>
+          </div>
+
+          <!-- Filters -->
+          <div class="mt-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="relative flex-1 max-w-xs">
+              <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5A6.5 6.5 0 114 10.5a6.5 6.5 0 0113 0z" /></svg>
+              <input
+                type="text"
+                x-model="search"
+                placeholder="Search recipient…"
+                class="w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+            </div>
+            <select x-model="statusFilter" class="rounded-md border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="disabled">Disabled</option>
+              <option value="expired">Expired</option>
+            </select>
+            <select x-model="serverFilter" class="rounded-md border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <option value="all">All servers</option>
+              <template x-for="srv in servers" :key="srv">
+                <option :value="srv" x-text="srv"></option>
+              </template>
+            </select>
+            <label class="inline-flex items-center gap-2 text-sm text-slate-600 select-none">
+              <input type="checkbox" x-model="expiringOnly" class="rounded border-slate-300 text-slate-900 focus:ring-slate-400">
+              Expiring soon
+            </label>
+          </div>
+
+          <!-- Desktop table -->
+          <div class="hidden lg:block mt-5 rounded-lg border border-slate-200 bg-white overflow-visible">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">
+                  <th class="px-4 py-3">Recipient</th>
+                  <th class="px-4 py-3">Server</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Expiry</th>
+                  <th class="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="sub in filtered()" :key="sub.id">
+                  <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                    <td class="px-4 py-3">
+                      <p class="font-medium text-slate-800" x-text="sub.recipient"></p>
+                      <p class="text-xs text-slate-400" x-text="sub.keyName"></p>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600" x-text="sub.server"></td>
+                    <td class="px-4 py-3">
+                      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="badgeClass(sub.status)" x-text="sub.status"></span>
+                      <span x-show="isExpiringSoon(sub)" class="ml-1 text-xs text-amber-600">soon</span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600">
+                      <input
+                        x-show="editingExpiryId === sub.id"
+                        x-cloak
+                        type="date"
+                        x-model="sub.expiryDate"
+                        @blur="editingExpiryId = null"
+                        @change="editingExpiryId = null"
+                        x-effect="if (editingExpiryId === sub.id) $nextTick(() => $el.focus())"
+                        class="rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                      >
+                      <button
+                        x-show="editingExpiryId !== sub.id"
+                        @click="editingExpiryId = sub.id"
+                        class="bg-transparent p-0 border-0 hover:underline decoration-dotted underline-offset-2"
+                        x-text="formatDate(sub.expiryDate)"
+                      ></button>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center justify-end gap-1">
+                        <button
+                          @click="copy(sub)"
+                          class="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                          <span x-text="copiedId === sub.id ? 'Copied!' : 'Copy'"></span>
+                        </button>
+                        <div class="relative">
+                          <button @click="menuOpenId = menuOpenId === sub.id ? null : sub.id" class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 100-4 2 2 0 000 4zM10 12a2 2 0 100-4 2 2 0 000 4zM10 18a2 2 0 100-4 2 2 0 000 4z" /></svg>
+                          </button>
+                          <div
+                            x-show="menuOpenId === sub.id"
+                            @click.outside="menuOpenId = null"
+                            x-cloak
+                            class="absolute right-0 z-10 mt-1 w-40 rounded-md border border-slate-200 bg-white py-1 shadow-lg text-left"
+                          >
+                            <button @click="extend(sub)" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">Extend</button>
+                            <button @click="moveTarget = sub; moveServer = sub.server; menuOpenId = null" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">Move</button>
+                            <button @click="reroll(sub)" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50" x-text="rerolledId === sub.id ? 'New key issued' : 'Reroll key'"></button>
+                            <button @click="toggleStatus(sub)" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50" x-text="sub.status === 'active' ? 'Disable' : 'Enable'"></button>
+                            <button @click="deleteTarget = sub; menuOpenId = null" class="block w-full px-3 py-1.5 text-left text-sm text-rose-600 hover:bg-rose-50">Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile cards -->
+          <div class="lg:hidden mt-5 space-y-3">
+            <template x-for="sub in filtered()" :key="sub.id">
+              <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <p class="font-medium text-slate-800 text-sm" x-text="sub.recipient"></p>
+                    <p class="text-xs text-slate-400" x-text="sub.keyName"></p>
+                  </div>
+                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="badgeClass(sub.status)" x-text="sub.status"></span>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span x-text="sub.server"></span>
+                  <span class="flex items-center gap-1">
+                    <input
+                      x-show="editingExpiryId === sub.id"
+                      x-cloak
+                      type="date"
+                      x-model="sub.expiryDate"
+                      @blur="editingExpiryId = null"
+                      @change="editingExpiryId = null"
+                      x-effect="if (editingExpiryId === sub.id) $nextTick(() => $el.focus())"
+                      class="rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+                    >
+                    <button
+                      x-show="editingExpiryId !== sub.id"
+                      @click="editingExpiryId = sub.id"
+                      class="bg-transparent p-0 border-0 hover:underline decoration-dotted underline-offset-2"
+                      x-text="formatDate(sub.expiryDate) + (isExpiringSoon(sub) ? ' · soon' : '')"
+                    ></button>
+                  </span>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                  <button
+                    @click="copy(sub)"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-700 active:bg-slate-100"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <span x-text="copiedId === sub.id ? 'Copied!' : 'Copy key'"></span>
+                  </button>
+                  <div class="relative">
+                    <button @click="menuOpenId = menuOpenId === sub.id ? null : sub.id" class="rounded-md border border-slate-200 p-2.5 text-slate-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 100-4 2 2 0 000 4zM10 12a2 2 0 100-4 2 2 0 000 4zM10 18a2 2 0 100-4 2 2 0 000 4z" /></svg>
+                    </button>
+                    <div
+                      x-show="menuOpenId === sub.id"
+                      @click.outside="menuOpenId = null"
+                      x-cloak
+                      class="absolute right-0 z-10 mt-1 w-40 rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+                    >
+                      <button @click="extend(sub)" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">Extend</button>
+                      <button @click="moveTarget = sub; moveServer = sub.server; menuOpenId = null" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">Move</button>
+                      <button @click="reroll(sub)" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50" x-text="rerolledId === sub.id ? 'New key issued' : 'Reroll key'"></button>
+                      <button @click="toggleStatus(sub)" class="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50" x-text="sub.status === 'active' ? 'Disable' : 'Enable'"></button>
+                      <button @click="deleteTarget = sub; menuOpenId = null" class="block w-full px-3 py-1.5 text-left text-sm text-rose-600 hover:bg-rose-50">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <p x-show="filtered().length === 0" class="mt-8 text-center text-sm text-slate-400">No subscriptions match these filters.</p>
+
+          <!-- Create modal -->
+          <div x-show="showCreate" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="showCreate = false" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+              <h2 class="text-base font-semibold">New subscription</h2>
+              <div class="mt-4 space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Recipient name</label>
+                  <input type="text" x-model="newSub.recipient" placeholder="e.g. Thet Naing" class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Key name</label>
+                  <input type="text" x-model="newSub.keyName" placeholder="e.g. thetnaing_phone" class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Saved server</label>
+                  <select x-model="newSub.server" class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                    <template x-for="srv in servers" :key="srv">
+                      <option :value="srv" x-text="srv"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Duration</label>
+                  <div class="flex gap-2">
+                    <template x-for="d in ['1','2','3']" :key="d">
+                      <button
+                        type="button"
+                        @click="newSub.duration = d"
+                        :class="newSub.duration === d ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'"
+                        class="flex-1 rounded-md py-1.5 text-sm font-medium"
+                        x-text="d + (d === '1' ? ' month' : ' months')"
+                      ></button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-5 flex gap-2">
+                <button @click="showCreate = false" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="createSub()" class="flex-1 rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Create</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Success panel -->
+          <div x-show="showSuccess" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="showSuccess = false" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl text-center" x-show="successSub">
+              <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+              </div>
+              <h2 class="mt-3 text-base font-semibold">Subscription created</h2>
+              <p class="mt-1 text-sm text-slate-500" x-text="successSub ? successSub.recipient + ' · expires ' + formatDate(successSub.expiryDate) : ''"></p>
+              <div class="mt-4 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <span class="flex-1 truncate text-left text-xs text-slate-500" x-text="'https://okm.hiyan.xyz/s/' + (successSub ? successSub.id : '') + 'a1b2c3'"></span>
+                <button @click="copy(successSub)" class="shrink-0 text-xs font-medium text-slate-700" x-text="copiedId === (successSub ? successSub.id : null) ? 'Copied!' : 'Copy link'"></button>
+              </div>
+              <button @click="showSuccess = false" class="mt-4 w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Done</button>
+            </div>
+          </div>
+
+          <!-- Delete confirm -->
+          <div x-show="deleteTarget" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="deleteTarget = null" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" x-show="deleteTarget">
+              <h2 class="text-base font-semibold">Delete subscription?</h2>
+              <p class="mt-1 text-sm text-slate-500" x-text="deleteTarget ? 'This deletes the Outline key for ' + deleteTarget.recipient + ' and removes the record permanently.' : ''"></p>
+              <div class="mt-4 flex gap-2">
+                <button @click="deleteTarget = null" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="confirmDelete()" class="flex-1 rounded-md bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-500">Delete</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Move popover -->
+          <div x-show="moveTarget" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="moveTarget = null" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" x-show="moveTarget">
+              <h2 class="text-base font-semibold">Move subscription</h2>
+              <p class="mt-1 text-sm text-slate-500" x-text="moveTarget ? 'Move ' + moveTarget.recipient + ' to a different saved server.' : ''"></p>
+              <select x-model="moveServer" class="mt-3 w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <template x-for="srv in servers" :key="srv">
+                  <option :value="srv" x-text="srv"></option>
+                </template>
+              </select>
+              <div class="mt-4 flex gap-2">
+                <button @click="moveTarget = null" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="confirmMove()" class="flex-1 rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Move</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div
+          x-show="page === 'servers'"
+          x-data="{
+            showAddServer: false,
+            showImportSuccess: false,
+            importedCount: 0,
+            newServer: { label: '', host: '', json: '' },
+            nextId: 3,
+            servers: [
+              { id: 1, label: 'Contabo SG', host: 'vpn1.example.com', status: 'active', subCount: 5 },
+              { id: 2, label: 'Azure SG', host: 'vpn2.example.com', status: 'active', subCount: 3 },
+            ],
+            syncData: {
+              1: {
+                foundOnServer: [ { keyName: 'hteik_new', note: 'Created outside the app — not in the ledger', resolved: false } ],
+                missingFromServer: [],
+              },
+              2: {
+                foundOnServer: [],
+                missingFromServer: [ { recipient: 'Kyaw Kyaw', keyName: 'kyawkyaw_main', note: 'Ledger record exists but the key is gone from the server', resolved: false } ],
+              },
+            },
+            syncTarget: null,
+            migrateSource: null,
+            migrateDest: '',
+            toggleStatus(srv) { srv.status = srv.status === 'active' ? 'inactive' : 'active' },
+            addServer() {
+              const srv = { id: this.nextId++, label: this.newServer.label || 'New server', host: this.newServer.host || '—', status: 'active', subCount: 4 };
+              this.servers.push(srv);
+              this.syncData[srv.id] = { foundOnServer: [], missingFromServer: [] };
+              this.showAddServer = false;
+              this.importedCount = 4;
+              this.showImportSuccess = true;
+              this.newServer = { label: '', host: '', json: '' };
+            },
+            confirmMigrate() {
+              const dest = this.servers.find(s => s.id == this.migrateDest);
+              if (dest) { dest.subCount += this.migrateSource.subCount; this.migrateSource.subCount = 0; }
+              this.migrateSource = null;
+              this.migrateDest = '';
+            }
+          }"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h1 class="text-2xl font-semibold tracking-tight">Saved Servers</h1>
+              <p class="mt-1 text-sm text-slate-500">Outline server credentials stored in Cockpit — no more pasting JSON every visit.</p>
+            </div>
+            <button
+              @click="showAddServer = true"
+              class="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+              <span class="hidden sm:inline">Add server</span>
+            </button>
+          </div>
+
+          <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <template x-for="srv in servers" :key="srv.id">
+              <div class="rounded-lg border border-slate-200 bg-white p-5">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <p class="font-medium text-slate-800" x-text="srv.label"></p>
+                    <p class="text-xs text-slate-400 mt-0.5" x-text="srv.host"></p>
+                  </div>
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                    :class="srv.status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-500/20'"
+                    x-text="srv.status"
+                  ></span>
+                </div>
+                <p class="mt-3 text-xs text-slate-500" x-text="srv.subCount + ' subscription' + (srv.subCount === 1 ? '' : 's')"></p>
+
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <button @click="syncTarget = srv" class="relative inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    Sync now
+                    <span
+                      x-show="(syncData[srv.id].foundOnServer.some(i => !i.resolved) || syncData[srv.id].missingFromServer.some(i => !i.resolved))"
+                      class="h-1.5 w-1.5 rounded-full bg-amber-500"
+                    ></span>
+                  </button>
+                  <button @click="migrateSource = srv; migrateDest = ''" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Migrate</button>
+                  <button @click="toggleStatus(srv)" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50" x-text="srv.status === 'active' ? 'Deactivate' : 'Activate'"></button>
+                  <button
+                    :disabled="srv.subCount > 0"
+                    :class="srv.subCount > 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-rose-50'"
+                    :title="srv.subCount > 0 ? 'Deactivate first — subscriptions still reference this server' : ''"
+                    class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-rose-600"
+                  >Delete</button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Add server modal -->
+          <div x-show="showAddServer" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="showAddServer = false" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+              <h2 class="text-base font-semibold">Add saved server</h2>
+              <div class="mt-4 space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Label</label>
+                  <input type="text" x-model="newServer.label" placeholder="e.g. Contabo SG" class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Public host (optional)</label>
+                  <input type="text" x-model="newServer.host" placeholder="e.g. vpn1.example.com" class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-500 mb-1">Server JSON</label>
+                  <textarea x-model="newServer.json" rows="3" placeholder='{"apiUrl": "https://...", "certSha256": "..."}' class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+                </div>
+                <p class="text-xs text-slate-400">Existing keys on this server are imported as active subscriptions automatically.</p>
+              </div>
+              <div class="mt-5 flex gap-2">
+                <button @click="showAddServer = false" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="addServer()" class="flex-1 rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Save</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Import success -->
+          <div x-show="showImportSuccess" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="showImportSuccess = false" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl text-center">
+              <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+              </div>
+              <h2 class="mt-3 text-base font-semibold">Server added</h2>
+              <p class="mt-1 text-sm text-slate-500" x-text="importedCount + ' existing keys imported as subscriptions.'"></p>
+              <button @click="showImportSuccess = false" class="mt-4 w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Done</button>
+            </div>
+          </div>
+
+          <!-- Sync -->
+          <div x-show="syncTarget" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="syncTarget = null" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-md rounded-lg bg-white p-5 shadow-xl" x-show="syncTarget">
+              <h2 class="text-base font-semibold">Sync — <span x-text="syncTarget?.label"></span></h2>
+              <p class="mt-1 text-xs text-slate-500">Comparing live keys on the server against ledger records.</p>
+
+              <template x-if="syncTarget">
+                <div class="mt-4 space-y-4">
+                  <div x-show="syncData[syncTarget.id].foundOnServer.length > 0">
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Found on server, not in ledger</p>
+                    <template x-for="item in syncData[syncTarget.id].foundOnServer" :key="item.keyName">
+                      <div class="mt-2 flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+                        <div>
+                          <p class="text-sm font-medium text-slate-800" x-text="item.keyName"></p>
+                          <p class="text-xs text-slate-400" x-text="item.note"></p>
+                        </div>
+                        <button
+                          @click="item.resolved = true"
+                          :disabled="item.resolved"
+                          :class="item.resolved ? 'text-emerald-600' : 'text-slate-700 hover:underline'"
+                          class="shrink-0 text-xs font-medium"
+                          x-text="item.resolved ? 'Imported' : 'Import'"
+                        ></button>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div x-show="syncData[syncTarget.id].missingFromServer.length > 0">
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">In ledger, missing on server</p>
+                    <template x-for="item in syncData[syncTarget.id].missingFromServer" :key="item.keyName">
+                      <div class="mt-2 flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+                        <div>
+                          <p class="text-sm font-medium text-slate-800" x-text="item.recipient + ' · ' + item.keyName"></p>
+                          <p class="text-xs text-slate-400" x-text="item.note"></p>
+                        </div>
+                        <button
+                          @click="item.resolved = true"
+                          :disabled="item.resolved"
+                          :class="item.resolved ? 'text-emerald-600' : 'text-rose-600 hover:underline'"
+                          class="shrink-0 text-xs font-medium"
+                          x-text="item.resolved ? 'Removed' : 'Remove record'"
+                        ></button>
+                      </div>
+                    </template>
+                  </div>
+
+                  <p
+                    x-show="syncData[syncTarget.id].foundOnServer.length === 0 && syncData[syncTarget.id].missingFromServer.length === 0"
+                    class="text-sm text-slate-400 text-center py-2"
+                  >Everything's in sync.</p>
+                </div>
+              </template>
+
+              <button @click="syncTarget = null" class="mt-5 w-full rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Close</button>
+            </div>
+          </div>
+
+          <!-- Migrate -->
+          <div x-show="migrateSource" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="migrateSource = null" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" x-show="migrateSource">
+              <h2 class="text-base font-semibold">Migrate subscriptions</h2>
+              <p class="mt-1 text-sm text-slate-500" x-text="migrateSource ? 'Move all ' + migrateSource.subCount + ' subscriptions from ' + migrateSource.label + ' to:' : ''"></p>
+              <select x-model="migrateDest" class="mt-3 w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <option value="" disabled>Choose a destination server</option>
+                <template x-for="srv in servers.filter(s => migrateSource && s.id !== migrateSource.id && s.status === 'active')" :key="srv.id">
+                  <option :value="srv.id" x-text="srv.label"></option>
+                </template>
+              </select>
+              <div class="mt-4 flex gap-2">
+                <button @click="migrateSource = null" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="confirmMigrate()" :disabled="!migrateDest" :class="!migrateDest ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-700'" class="flex-1 rounded-md bg-slate-900 py-2 text-sm font-medium text-white">Migrate</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div
+          x-show="page === 'classic'"
+          x-data="{
+            currentConnected: false,
+            currentJsonInput: '',
+            currentConnectError: '',
+            currentLabel: '',
+            keys: [],
+            nextKeyId: 6,
+            showCreateKey: false,
+            newKeyName: '',
+            copiedId: null,
+            deleteTarget: null,
+            showDeleteAll: false,
+            deleteAllResult: null,
+            destConnected: false,
+            destJsonInput: '',
+            destConnectError: '',
+            destLabel: '',
+            migrating: false,
+            migrateResults: null,
+            connectCurrent() {
+              if (!this.currentJsonInput.trim().startsWith('{') || !this.currentJsonInput.includes('apiUrl')) {
+                this.currentConnectError = 'Invalid server JSON — must include an https apiUrl.';
+                return;
+              }
+              this.currentConnectError = '';
+              this.currentConnected = true;
+              this.currentLabel = 'vpn1.example.com';
+              this.keys = [
+                { id: 1, name: 'aungko_phone', usage: '1.2 GB' },
+                { id: 2, name: 'susu_laptop', usage: '340 MB' },
+                { id: 3, name: 'zawzaw_desktop', usage: '2.8 GB' },
+                { id: 4, name: 'thida_home', usage: '156 MB' },
+                { id: 5, name: 'test_key', usage: '0 B' },
+              ];
+            },
+            disconnectCurrent() {
+              this.currentConnected = false;
+              this.currentJsonInput = '';
+              this.currentConnectError = '';
+              this.keys = [];
+              this.destConnected = false;
+              this.destJsonInput = '';
+              this.migrateResults = null;
+            },
+            copy(key) { this.copiedId = key.id; setTimeout(() => { this.copiedId = null }, 1500) },
+            confirmDeleteKey() { this.keys = this.keys.filter(k => k.id !== this.deleteTarget.id); this.deleteTarget = null },
+            createKey() {
+              this.keys.push({ id: this.nextKeyId++, name: this.newKeyName || 'new_key', usage: '0 B' });
+              this.showCreateKey = false;
+              this.newKeyName = '';
+            },
+            confirmDeleteAll() {
+              const total = this.keys.length;
+              const failIdx = total > 2 ? 1 : -1;
+              this.deleteAllResult = {
+                deleted: failIdx >= 0 ? total - 1 : total,
+                failed: failIdx >= 0 ? 1 : 0,
+                details: this.keys.map((k, i) => ({ name: k.name, status: i === failIdx ? 'failed' : 'success', error: i === failIdx ? 'Connection timed out' : null })),
+              };
+              this.keys = failIdx >= 0 ? [this.keys[failIdx]] : [];
+              this.showDeleteAll = false;
+            },
+            connectDest() {
+              if (!this.destJsonInput.trim().startsWith('{') || !this.destJsonInput.includes('apiUrl')) {
+                this.destConnectError = 'Invalid server JSON — must include an https apiUrl.';
+                return;
+              }
+              this.destConnectError = '';
+              this.destConnected = true;
+              this.destLabel = 'vpn2.example.com';
+            },
+            startOverMigrate() { this.destConnected = false; this.destJsonInput = ''; this.destConnectError = ''; this.migrateResults = null },
+            startMigration() {
+              this.migrating = true;
+              setTimeout(() => {
+                this.migrateResults = this.keys.map((k, i) => {
+                  if (i === 1) return { requested: k.name, final: null, status: 'failed', error: 'Destination unreachable' };
+                  if (i === 2) return { requested: k.name, final: k.name + '_2', status: 'success', url: 'ss://YWVzLTI1Ni1nY206cGFzcw@198.51.100.24:8388/?outline=1' };
+                  return { requested: k.name, final: k.name, status: 'success', url: 'ss://YWVzLTI1Ni1nY206cGFzcw@198.51.100.24:8388/?outline=1' };
+                });
+                this.migrating = false;
+              }, 900);
+            },
+            retryFailed() {
+              this.migrateResults = this.migrateResults.map(r => r.status === 'failed'
+                ? { requested: r.requested, final: r.requested, status: 'success', url: 'ss://YWVzLTI1Ni1nY206cGFzcw@198.51.100.24:8388/?outline=1' }
+                : r);
+            }
+          }"
+        >
+          <h1 class="text-2xl font-semibold tracking-tight">Classic Manager</h1>
+          <p class="mt-1 text-sm text-slate-500">Quick-connect workspace — paste server JSON to list, create, delete, or migrate keys directly.</p>
+
+          <div class="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+
+            <!-- Current server panel -->
+            <div class="rounded-lg border border-slate-200 bg-white p-5">
+              <h2 class="text-sm font-semibold text-slate-800">Current server</h2>
+
+              <template x-if="!currentConnected">
+                <div class="mt-3">
+                  <textarea x-model="currentJsonInput" rows="4" placeholder='Paste server JSON, e.g. {"apiUrl": "https://...", "certSha256": "..."}' class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+                  <p x-show="currentConnectError" x-text="currentConnectError" class="mt-1 text-xs text-rose-600"></p>
+                  <button @click="connectCurrent()" class="mt-3 w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Connect</button>
+                </div>
+              </template>
+
+              <template x-if="currentConnected">
+                <div class="mt-3">
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-400" x-text="currentLabel"></p>
+                    <button @click="disconnectCurrent()" class="text-xs font-medium text-slate-400 hover:text-slate-600">Start over</button>
+                  </div>
+
+                  <div class="mt-3 space-y-2">
+                    <template x-for="key in keys" :key="key.id">
+                      <div class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+                        <div class="min-w-0">
+                          <p class="text-sm font-medium text-slate-800 truncate" x-text="key.name"></p>
+                          <p class="text-xs text-slate-400" x-text="key.usage"></p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <button @click="copy(key)" class="text-xs font-medium text-slate-600 hover:text-slate-900" x-text="copiedId === key.id ? 'Copied!' : 'Copy'"></button>
+                          <button @click="deleteTarget = key" class="text-xs font-medium text-rose-600 hover:text-rose-700">Delete</button>
+                        </div>
+                      </div>
+                    </template>
+                    <p x-show="keys.length === 0" class="text-sm text-slate-400 text-center py-3">No keys on this server.</p>
+                  </div>
+
+                  <div class="mt-4 flex gap-2">
+                    <button @click="showCreateKey = true" class="flex-1 rounded-md border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">Create key</button>
+                    <button @click="showDeleteAll = true" :disabled="keys.length === 0" :class="keys.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-rose-50'" class="flex-1 rounded-md border border-slate-200 py-2 text-xs font-medium text-rose-600">Delete all</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Connector -->
+            <div class="hidden lg:flex items-center justify-center h-full pt-16">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            </div>
+
+            <!-- Migrate-to panel -->
+            <div class="rounded-lg border border-slate-200 bg-white p-5">
+              <h2 class="text-sm font-semibold text-slate-800">Migrate to</h2>
+
+              <template x-if="!currentConnected">
+                <p class="mt-3 text-sm text-slate-400">Connect a current server first.</p>
+              </template>
+
+              <template x-if="currentConnected && !destConnected">
+                <div class="mt-3">
+                  <textarea x-model="destJsonInput" rows="4" placeholder='Paste destination server JSON' class="w-full rounded-md border border-slate-200 py-2 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+                  <p x-show="destConnectError" x-text="destConnectError" class="mt-1 text-xs text-rose-600"></p>
+                  <button @click="connectDest()" class="mt-3 w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Connect</button>
+                </div>
+              </template>
+
+              <template x-if="currentConnected && destConnected">
+                <div class="mt-3">
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-400" x-text="destLabel"></p>
+                    <button @click="startOverMigrate()" class="text-xs font-medium text-slate-400 hover:text-slate-600">Start over</button>
+                  </div>
+
+                  <button
+                    x-show="!migrateResults"
+                    @click="startMigration()"
+                    :disabled="migrating"
+                    class="mt-3 w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                    x-text="migrating ? 'Migrating…' : 'Migrate ' + keys.length + ' key' + (keys.length === 1 ? '' : 's')"
+                  ></button>
+
+                  <div x-show="migrateResults" class="mt-3 space-y-2">
+                    <template x-for="r in migrateResults" :key="r.requested">
+                      <div class="rounded-md border border-slate-200 px-3 py-2">
+                        <div class="flex items-center justify-between">
+                          <p class="text-sm font-medium text-slate-800" x-text="r.final || r.requested"></p>
+                          <span class="text-xs font-medium" :class="r.status === 'success' ? 'text-emerald-600' : 'text-rose-600'" x-text="r.status === 'success' ? 'Success' : 'Failed'"></span>
+                        </div>
+                        <p x-show="r.final && r.final !== r.requested" class="text-xs text-slate-400">renamed from <span x-text="r.requested"></span></p>
+                        <p x-show="r.status === 'failed'" class="text-xs text-rose-500" x-text="r.error"></p>
+                      </div>
+                    </template>
+                    <div class="flex gap-2 pt-1">
+                      <button
+                        x-show="migrateResults.some(r => r.status === 'failed')"
+                        @click="retryFailed()"
+                        class="flex-1 rounded-md border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >Retry failed keys</button>
+                      <button @click="startOverMigrate()" class="flex-1 rounded-md border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">Start over</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+          </div>
+
+          <!-- Create key modal -->
+          <div x-show="showCreateKey" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="showCreateKey = false" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+              <h2 class="text-base font-semibold">Create key</h2>
+              <input type="text" x-model="newKeyName" placeholder="Key name" class="mt-3 w-full rounded-md border border-slate-200 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <div class="mt-4 flex gap-2">
+                <button @click="showCreateKey = false" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="createKey()" class="flex-1 rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Create</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Delete one key confirm -->
+          <div x-show="deleteTarget" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="deleteTarget = null" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" x-show="deleteTarget">
+              <h2 class="text-base font-semibold">Delete key?</h2>
+              <p class="mt-1 text-sm text-slate-500" x-text="deleteTarget ? 'This permanently deletes ' + deleteTarget.name + '.' : ''"></p>
+              <div class="mt-4 flex gap-2">
+                <button @click="deleteTarget = null" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button @click="confirmDeleteKey()" class="flex-1 rounded-md bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-500">Delete</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Delete all confirm / result -->
+          <div x-show="showDeleteAll || deleteAllResult" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div @click="showDeleteAll = false; deleteAllResult = null" class="absolute inset-0 bg-black/30"></div>
+            <div class="relative w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+              <template x-if="showDeleteAll && !deleteAllResult">
+                <div>
+                  <h2 class="text-base font-semibold">Delete all keys?</h2>
+                  <p class="mt-1 text-sm text-slate-500" x-text="'This permanently deletes all ' + keys.length + ' keys on this server.'"></p>
+                  <div class="mt-4 flex gap-2">
+                    <button @click="showDeleteAll = false" class="flex-1 rounded-md border border-slate-200 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                    <button @click="confirmDeleteAll()" class="flex-1 rounded-md bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-500">Delete all</button>
+                  </div>
+                </div>
+              </template>
+              <template x-if="deleteAllResult">
+                <div>
+                  <h2 class="text-base font-semibold">Delete all — results</h2>
+                  <p class="mt-1 text-sm text-slate-500" x-text="deleteAllResult.deleted + ' deleted, ' + deleteAllResult.failed + ' failed.'"></p>
+                  <div class="mt-3 space-y-1.5 max-h-48 overflow-y-auto">
+                    <template x-for="d in deleteAllResult.details" :key="d.name">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-700" x-text="d.name"></span>
+                        <span :class="d.status === 'success' ? 'text-emerald-600' : 'text-rose-600'" x-text="d.status === 'success' ? 'Deleted' : d.error"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <button @click="deleteAllResult = null" class="mt-4 w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700">Done</button>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ============ PUBLIC SHELL (recipient page — no admin nav) ============ -->
+  <div x-show="page === 'recipient'" x-cloak class="min-h-screen flex flex-col">
+    <header class="h-14 flex items-center px-4 border-b border-slate-200 bg-white">
+      <span class="text-base font-semibold tracking-tight">OKM</span>
+    </header>
+    <main
+      class="flex-1 flex flex-col items-center justify-center p-6"
+      x-data="{
+        demoStatus: 'active',
+        copied: false,
+        recipient: { name: 'Aung Ko', expiry: 'Sep 15, 2026', key: 'ss://YWVzLTI1Ni1nY206cGFzcw@198.51.100.10:8388/?outline=1#aungko_phone' },
+        copy() { this.copied = true; setTimeout(() => { this.copied = false }, 1500) }
+      }"
+    >
+      <!-- Demo-only preview toggle, not part of the real page -->
+      <div class="mb-4 inline-flex items-center gap-0.5 rounded-md border border-dashed border-slate-300 p-0.5 text-xs">
+        <span class="px-2 text-slate-400">Preview:</span>
+        <button @click="demoStatus = 'active'" :class="demoStatus === 'active' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'" class="px-2 py-1 rounded">Active</button>
+        <button @click="demoStatus = 'disabled'" :class="demoStatus === 'disabled' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'" class="px-2 py-1 rounded">Disabled</button>
+        <button @click="demoStatus = 'expired'" :class="demoStatus === 'expired' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'" class="px-2 py-1 rounded">Expired</button>
+      </div>
+
+      <div lang="my" class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 text-center">
+        <p class="text-sm text-slate-400">မင်္ဂလာပါ</p>
+        <h1 class="text-xl font-semibold tracking-tight" x-text="recipient.name"></h1>
+
+        <template x-if="demoStatus === 'active'">
+          <div class="mt-5">
+            <p class="text-xs text-slate-400"><span x-text="recipient.expiry"></span> အထိ သက်တမ်းရှိသည်</p>
+            <div class="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-left">
+              <p class="text-xs font-mono text-slate-600 break-all" x-text="recipient.key"></p>
+            </div>
+            <button @click="copy()" class="mt-3 w-full rounded-md bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-700" x-text="copied ? 'ကူးယူပြီးပါပြီ' : 'ကီးကုဒ် ကူးယူရန်'"></button>
+          </div>
+        </template>
+
+        <template x-if="demoStatus !== 'active'">
+          <div class="mt-5">
+            <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            </div>
+            <p class="mt-3 text-sm font-medium text-slate-600" x-text="demoStatus === 'expired' ? 'ဤစာရင်းသွင်းမှု သက်တမ်းကုန်သွားပါပြီ။' : 'ဤစာရင်းသွင်းမှုကို လောလောဆယ် ပိတ်ထားပါသည်။'"></p>
+            <p class="mt-1 text-xs text-slate-400">အမှားဖြစ်သည်ဟု ထင်ပါက သင့်အက်ဒမင်ကို ဆက်သွယ်ပါ။</p>
+          </div>
+        </template>
+
+        <div class="mt-5 pt-4 border-t border-slate-100">
+          <p class="text-xs text-slate-400">အကူအညီလိုပါသလား? သင့်အက်ဒမင်ကို မက်ဆေ့ချ်ပို့ပါ</p>
+          <div class="mt-2 flex items-center justify-center gap-2">
+            <a href="https://t.me/okm_admin" class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+              Telegram
+            </a>
+            <a href="viber://chat?number=%2B959XXXXXXXX" class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg>
+              Viber
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <button
+        @click="page = 'subscriptions'"
+        class="mt-6 text-xs font-medium text-slate-400 hover:text-slate-600"
+      >← Back to admin (preview only)</button>
+    </main>
+  </div>
+
+</body>
+</html>
