@@ -66,7 +66,7 @@ $apiUrl, string $path, ?array $json = null): array`) that: rejects any
 
 ---
 
-### Task [1.3]: Wire Alpine.js and htmx into the layout
+### Task [1.3]: Wire Alpine.js and htmx into the layout [DONE]
 
 #### Subtasks
 
