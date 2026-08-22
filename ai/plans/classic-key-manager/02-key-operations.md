@@ -84,7 +84,7 @@ name isn't found.
 
 ---
 
-### Task [2.4]: Delete all keys
+### Task [2.4]: Delete all keys [DONE]
 
 #### Subtasks
 

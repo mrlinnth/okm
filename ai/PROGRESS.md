@@ -3,23 +3,28 @@
 ## Current
 
 - **Feature**: classic-key-manager
-- **Task**: 2.4 (Delete all keys)
+- **Task**: 3.1 (Duplicate-name suffix resolution)
 - **Branch**: feature-classic-key-manager
 - **Started**: 2026-08-22
-- **Status**: Task 2.3 done, implementing 2.4
+- **Status**: Phase 2 (tasks 2.1–2.4) complete, starting Phase 3
 
 ### Notes
 
-- Feature has 4 plan files, 14 tasks total, 7 complete (Phase 2 almost done).
-- `OutlineService::deleteKey()` resolves the ID by name via the new
-  `fetchAccessKeys()`/`resolveKeyIdByName()` helpers (shared with
-  `listKeys()`), then `DELETE /access-keys/{id}`. Throws
-  `OutlineRequestException` if no key matches the name.
-- Full suite: 25/25 passing.
+- Feature has 4 plan files, 14 tasks total, 8 complete (Phase 1 + 2 done).
+- `OutlineService::deleteAllKeys()` reuses `fetchAccessKeys()`, deletes
+  sequentially, catches `OutlineRequestException` per key (never aborts the
+  loop), returns `{deleted, failed, results[]}`.
+- Full suite: 27/27 passing.
+- Task 3.1 needs a pure `resolveUniqueName(string $requested, array
+$existingNames, array $reservedInBatch): string` — no I/O, `_2`/`_3`...
+  suffixes (underscore, not hyphen).
+- Task 3.2 (migrate) depends on 3.1 + `createKey()`/`listKeys()` (already
+  done). Key behaviors: check destination reachable before any writes,
+  continue past per-key failures, support `onlyNames` for retry.
 
 ## Up Next
 
-- Phase 3 (03-migrate.md): duplicate-name suffix resolution, migrate endpoint
+- 3.2: Migrate batch endpoint
 - Phase 4 (04-ui.md): Classic Manager view
 
 ## Blockers

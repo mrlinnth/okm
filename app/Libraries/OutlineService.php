@@ -85,6 +85,33 @@ class OutlineService
     }
 
     /**
+     * Deletes every key on the server, continuing past individual failures.
+     *
+     * @return array{deleted: int, failed: int, results: array<int, array{name: string, status: string, error?: string}>}
+     */
+    public function deleteAllKeys(string $apiUrl): array
+    {
+        $deleted = 0;
+        $failed = 0;
+        $results = [];
+
+        foreach ($this->fetchAccessKeys($apiUrl) as $key) {
+            $name = (string) ($key['name'] ?? '');
+
+            try {
+                $this->request('DELETE', $apiUrl, '/access-keys/' . (string) $key['id']);
+                $results[] = ['name' => $name, 'status' => 'deleted'];
+                $deleted++;
+            } catch (OutlineRequestException $e) {
+                $results[] = ['name' => $name, 'status' => 'failed', 'error' => $e->getMessage()];
+                $failed++;
+            }
+        }
+
+        return ['deleted' => $deleted, 'failed' => $failed, 'results' => $results];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     protected function fetchAccessKeys(string $apiUrl): array

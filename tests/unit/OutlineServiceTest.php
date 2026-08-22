@@ -149,6 +149,34 @@ final class OutlineServiceTest extends CIUnitTestCase
         $service->deleteKey('https://203.0.113.10', 'ghost');
     }
 
+    public function testDeleteAllKeysContinuesPastIndividualFailures(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            ['status' => 200, 'body' => json_encode(['accessKeys' => [
+                ['id' => '1', 'name' => 'alice'],
+                ['id' => '2', 'name' => 'bob'],
+                ['id' => '3', 'name' => 'carol'],
+            ]]), 'error' => null],
+            ['status' => 204, 'body' => '', 'error' => null], // delete alice: ok
+            ['status' => 500, 'body' => 'server error', 'error' => null], // delete bob: fails
+            ['status' => 204, 'body' => '', 'error' => null], // delete carol: ok
+        ];
+
+        $result = $service->deleteAllKeys('https://203.0.113.10');
+
+        $this->assertSame(2, $result['deleted']);
+        $this->assertSame(1, $result['failed']);
+        $this->assertSame(
+            [
+                ['name' => 'alice', 'status' => 'deleted'],
+                ['name' => 'bob', 'status' => 'failed', 'error' => 'Outline API returned HTTP 500: server error'],
+                ['name' => 'carol', 'status' => 'deleted'],
+            ],
+            $result['results'],
+        );
+    }
+
     /**
      * @dataProvider provideFormatBytesCases
      */

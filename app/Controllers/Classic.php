@@ -88,7 +88,20 @@ class Classic extends WebController
 
     public function deleteAllKeys(): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        $body = $this->request->getJSON(true) ?? [];
+
+        $apiUrl = $this->requireString($body, 'apiUrl');
+        if ($apiUrl === null) {
+            return $this->errorResponse(422, 'apiUrl is required.');
+        }
+
+        try {
+            $result = Services::outline()->deleteAllKeys($apiUrl);
+        } catch (OutlineRequestException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
+
+        return $this->response->setJSON($result);
     }
 
     public function migrate(): ResponseInterface
