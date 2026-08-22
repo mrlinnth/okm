@@ -32,7 +32,7 @@ constructor override) confirming the merged shape and formatted usage.
 
 ---
 
-### Task [2.2]: Create key
+### Task [2.2]: Create key [DONE]
 
 #### Subtasks
 

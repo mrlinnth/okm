@@ -52,6 +52,28 @@ class OutlineService
     }
 
     /**
+     * Creates a key, then renames it to $name (two Outline API calls,
+     * matching the current app's behavior).
+     *
+     * @return array{id: string, name: string, accessUrl: string, bytesUsed: int, usage: string}
+     */
+    public function createKey(string $apiUrl, string $name): array
+    {
+        $created = $this->request('POST', $apiUrl, '/access-keys');
+        $id = (string) $created['id'];
+
+        $this->request('PUT', $apiUrl, "/access-keys/{$id}/name", ['name' => $name]);
+
+        return [
+            'id' => $id,
+            'name' => $name,
+            'accessUrl' => (string) ($created['accessUrl'] ?? ''),
+            'bytesUsed' => 0,
+            'usage' => $this->formatBytes(0),
+        ];
+    }
+
+    /**
      * Formats a byte count as B/KB/MB/GB, matching the current app's display.
      */
     public function formatBytes(int $bytes): string

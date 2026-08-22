@@ -100,6 +100,24 @@ final class OutlineServiceTest extends CIUnitTestCase
         $this->assertStringEndsWith('/metrics/transfer', $service->capturedCurlOptionsQueue[1][CURLOPT_URL]);
     }
 
+    public function testCreateKeyCreatesThenRenames(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            ['status' => 200, 'body' => json_encode(['id' => '7', 'accessUrl' => 'ss://seven']), 'error' => null],
+            ['status' => 204, 'body' => '', 'error' => null],
+        ];
+
+        $key = $service->createKey('https://203.0.113.10', 'new-key');
+
+        $this->assertSame(['id' => '7', 'name' => 'new-key', 'accessUrl' => 'ss://seven', 'bytesUsed' => 0, 'usage' => '0 B'], $key);
+        $this->assertSame('POST', $service->capturedCurlOptionsQueue[0][CURLOPT_CUSTOMREQUEST]);
+        $this->assertStringEndsWith('/access-keys', $service->capturedCurlOptionsQueue[0][CURLOPT_URL]);
+        $this->assertSame('PUT', $service->capturedCurlOptionsQueue[1][CURLOPT_CUSTOMREQUEST]);
+        $this->assertStringEndsWith('/access-keys/7/name', $service->capturedCurlOptionsQueue[1][CURLOPT_URL]);
+        $this->assertSame(json_encode(['name' => 'new-key']), $service->capturedCurlOptionsQueue[1][CURLOPT_POSTFIELDS]);
+    }
+
     /**
      * @dataProvider provideFormatBytesCases
      */

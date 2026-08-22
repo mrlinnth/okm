@@ -72,4 +72,34 @@ final class ClassicControllerTest extends CIUnitTestCase
         $result->assertStatus(502);
         $result->assertJSONFragment(['error' => 'Outline server unreachable.']);
     }
+
+    public function testCreateKeyReturnsCreatedKeyWithRequestedName(): void
+    {
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public function createKey(string $apiUrl, string $name): array
+            {
+                return ['id' => '9', 'name' => $name, 'accessUrl' => 'ss://nine', 'bytesUsed' => 0, 'usage' => '0 B'];
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/create', [
+            'apiUrl' => 'https://203.0.113.10/api',
+            'name' => 'my-new-key',
+        ]);
+
+        $result->assertStatus(200);
+        $this->assertSame('my-new-key', json_decode($result->getJSON(), true)['name']);
+    }
+
+    public function testCreateKeyRejectsMissingName(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/classic/keys/create', ['apiUrl' => 'https://203.0.113.10/api']);
+
+        $result->assertStatus(422);
+    }
 }

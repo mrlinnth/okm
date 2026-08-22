@@ -3,37 +3,26 @@
 ## Current
 
 - **Feature**: classic-key-manager
-- **Task**: 2.2 (Create key)
+- **Task**: 2.3 (Delete key)
 - **Branch**: feature-classic-key-manager
 - **Started**: 2026-08-22
-- **Status**: Task 2.1 done, implementing 2.2
+- **Status**: Task 2.2 done, implementing 2.3
 
 ### Notes
 
-- Feature has 4 plan files, 14 tasks total, 5 complete.
-- `OutlineService::listKeys()` calls `/access-keys` then `/metrics/transfer`
-  and merges by key id; `formatBytes()` produces B/KB/MB/GB. Both public
-  (needed for the `Config\Services::outline()` service + controller use).
-- Added `Config\Services::outline()` (mirrors `cockpit()`/`aimeos()`) so
-  `Classic` controller resolves `OutlineService` through the service
-  container — lets feature tests swap in a fake via `Services::injectMock`.
-- `Classic::listKeys()` reads `apiUrl` from the JSON body (`getJSON(true)`),
-  422s on missing/invalid, 502s with the exception message on
-  `OutlineRequestException`.
-- Test convention for faking Outline: anonymous class `extends OutlineService`
-  with an empty `__construct()` (skips real config binding) overriding just
-  the method under test — see `tests/feature/ClassicControllerTest.php`.
-  For unit-level transport tests, use `TestableOutlineService` in
-  `tests/unit/OutlineServiceTest.php` (overrides `executeCurl()`,
-  supports a `fakeResponseQueue` for multi-call methods like `listKeys()`).
-  Always use a literal IP (e.g. `203.0.113.10`) as `apiUrl` in tests that go
-  through real `request()` — a hostname needs live DNS resolution.
-- Full suite: 18/18 passing.
+- Feature has 4 plan files, 14 tasks total, 6 complete.
+- `OutlineService::createKey()` does POST /access-keys then PUT
+  /access-keys/{id}/name (two calls), returns the merged key record with
+  the requested name applied.
+- Added `Classic::requireString()` / `errorResponse()` private helpers —
+  the apiUrl/name-required-string + 422/502 pattern repeats across
+  list/create/delete/delete-all, so it's justified now (not speculative).
+- Full suite: 21/21 passing.
 
 ## Up Next
 
-- 2.3: Delete key
 - 2.4: Delete all keys
+- Phase 3 (03-migrate.md): duplicate-name suffix resolution, migrate endpoint
 
 ## Blockers
 

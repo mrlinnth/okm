@@ -24,16 +24,17 @@ class Classic extends WebController
 
     public function listKeys(): ResponseInterface
     {
-        $apiUrl = $this->request->getJSON(true)['apiUrl'] ?? null;
+        $body = $this->request->getJSON(true) ?? [];
 
-        if (!is_string($apiUrl) || $apiUrl === '') {
-            return $this->response->setStatusCode(422)->setJSON(['error' => 'apiUrl is required.']);
+        $apiUrl = $this->requireString($body, 'apiUrl');
+        if ($apiUrl === null) {
+            return $this->errorResponse(422, 'apiUrl is required.');
         }
 
         try {
             $keys = Services::outline()->listKeys($apiUrl);
         } catch (OutlineRequestException $e) {
-            return $this->response->setStatusCode(502)->setJSON(['error' => $e->getMessage()]);
+            return $this->errorResponse(502, $e->getMessage());
         }
 
         return $this->response->setJSON($keys);
@@ -41,7 +42,25 @@ class Classic extends WebController
 
     public function createKey(): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        $body = $this->request->getJSON(true) ?? [];
+
+        $apiUrl = $this->requireString($body, 'apiUrl');
+        if ($apiUrl === null) {
+            return $this->errorResponse(422, 'apiUrl is required.');
+        }
+
+        $name = $this->requireString($body, 'name');
+        if ($name === null) {
+            return $this->errorResponse(422, 'name is required.');
+        }
+
+        try {
+            $key = Services::outline()->createKey($apiUrl, $name);
+        } catch (OutlineRequestException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
+
+        return $this->response->setJSON($key);
     }
 
     public function deleteKey(): ResponseInterface
@@ -57,5 +76,17 @@ class Classic extends WebController
     public function migrate(): ResponseInterface
     {
         return $this->response->setJSON([]);
+    }
+
+    private function requireString(array $body, string $key): ?string
+    {
+        $value = $body[$key] ?? null;
+
+        return (is_string($value) && $value !== '') ? $value : null;
+    }
+
+    private function errorResponse(int $status, string $message): ResponseInterface
+    {
+        return $this->response->setStatusCode($status)->setJSON(['error' => $message]);
     }
 }
