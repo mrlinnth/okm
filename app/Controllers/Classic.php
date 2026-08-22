@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Libraries\OutlineRequestException;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\Services;
 
 /**
  * Classic Key Manager Controller
@@ -22,7 +24,19 @@ class Classic extends WebController
 
     public function listKeys(): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        $apiUrl = $this->request->getJSON(true)['apiUrl'] ?? null;
+
+        if (!is_string($apiUrl) || $apiUrl === '') {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'apiUrl is required.']);
+        }
+
+        try {
+            $keys = Services::outline()->listKeys($apiUrl);
+        } catch (OutlineRequestException $e) {
+            return $this->response->setStatusCode(502)->setJSON(['error' => $e->getMessage()]);
+        }
+
+        return $this->response->setJSON($keys);
     }
 
     public function createKey(): ResponseInterface

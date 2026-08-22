@@ -1,7 +1,10 @@
 <?php
 
+use App\Libraries\OutlineRequestException;
+use App\Libraries\OutlineService;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 
 /**
  * @internal
@@ -10,6 +13,12 @@ final class ClassicControllerTest extends CIUnitTestCase
 {
     use FeatureTestTrait;
 
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        Services::reset();
+    }
+
     public function testIndexReturnsOk(): void
     {
         $result = $this->get('/classic');
@@ -17,11 +26,50 @@ final class ClassicControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
     }
 
-    public function testListKeysStubReturnsJson(): void
+    public function testListKeysReturnsMergedKeysFromOutlineService(): void
     {
-        $result = $this->post('/classic/keys/list');
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public function listKeys(string $apiUrl): array
+            {
+                return [['id' => '1', 'name' => 'alice', 'accessUrl' => 'ss://one', 'bytesUsed' => 0, 'usage' => '0 B']];
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/list', ['apiUrl' => 'https://203.0.113.10/api']);
 
         $result->assertStatus(200);
-        $result->assertJSON();
+        $this->assertSame('alice', json_decode($result->getJSON(), true)[0]['name']);
+    }
+
+    public function testListKeysRejectsMissingApiUrl(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/classic/keys/list', []);
+
+        $result->assertStatus(422);
+    }
+
+    public function testListKeysReturns502OnOutlineFailure(): void
+    {
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public function listKeys(string $apiUrl): array
+            {
+                throw new OutlineRequestException('Outline server unreachable.');
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/list', ['apiUrl' => 'https://outline.example/api']);
+
+        $result->assertStatus(502);
+        $result->assertJSONFragment(['error' => 'Outline server unreachable.']);
     }
 }

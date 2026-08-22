@@ -63,4 +63,19 @@ class Services extends BaseService
 
         return new \App\Libraries\AimeosService();
     }
+
+    /**
+     * Outline Server Service
+     *
+     * @param bool $getShared
+     * @return \App\Libraries\OutlineService
+     */
+    public static function outline(bool $getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('outline');
+        }
+
+        return new \App\Libraries\OutlineService();
+    }
 }

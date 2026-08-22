@@ -2,7 +2,7 @@
 
 Depends on: Phase 1 (`OutlineService` transport, `Classic` controller/routes).
 
-### Task [2.1]: List keys (merged with transfer metrics)
+### Task [2.1]: List keys (merged with transfer metrics) [DONE]
 
 #### Subtasks
 

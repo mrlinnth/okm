@@ -23,6 +23,54 @@ class OutlineService
     }
 
     /**
+     * Lists access keys for a server, merged with their transfer usage.
+     *
+     * @return array<int, array{id: string, name: string, accessUrl: string, bytesUsed: int, usage: string}>
+     */
+    public function listKeys(string $apiUrl): array
+    {
+        $keysResponse = $this->request('GET', $apiUrl, '/access-keys');
+        $metricsResponse = $this->request('GET', $apiUrl, '/metrics/transfer');
+
+        $usageByKeyId = $metricsResponse['bytesTransferredByUserId'] ?? [];
+
+        $keys = [];
+
+        foreach ($keysResponse['accessKeys'] ?? [] as $key) {
+            $bytesUsed = (int) ($usageByKeyId[$key['id']] ?? 0);
+
+            $keys[] = [
+                'id' => (string) $key['id'],
+                'name' => (string) ($key['name'] ?? ''),
+                'accessUrl' => (string) ($key['accessUrl'] ?? ''),
+                'bytesUsed' => $bytesUsed,
+                'usage' => $this->formatBytes($bytesUsed),
+            ];
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Formats a byte count as B/KB/MB/GB, matching the current app's display.
+     */
+    public function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $value = (float) $bytes;
+        $unitIndex = 0;
+
+        while ($value >= 1024 && $unitIndex < count($units) - 1) {
+            $value /= 1024;
+            $unitIndex++;
+        }
+
+        $formatted = $unitIndex === 0 ? (string) (int) $value : number_format($value, 1);
+
+        return "{$formatted} {$units[$unitIndex]}";
+    }
+
+    /**
      * Send a request to an Outline server, enforcing HTTPS-only,
      * DNS-resolve-before-connect, blocked-range rejection, and IP pinning
      * (to close the DNS-rebinding window between the check and the connect).
