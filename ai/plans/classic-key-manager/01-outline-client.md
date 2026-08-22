@@ -97,7 +97,7 @@ console errors.
 
 ---
 
-### Task [1.4]: Classic controller skeleton and routes
+### Task [1.4]: Classic controller skeleton and routes [DONE]
 
 #### Subtasks
 

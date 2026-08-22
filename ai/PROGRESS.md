@@ -3,33 +3,33 @@
 ## Current
 
 - **Feature**: classic-key-manager
-- **Task**: 1.4 (Classic controller skeleton and routes)
+- **Task**: 2.1 (List keys, merged with transfer metrics)
 - **Branch**: feature-classic-key-manager
 - **Started**: 2026-08-22
-- **Status**: Tasks 1.1–1.3 done, implementing 1.4
+- **Status**: Phase 1 (tasks 1.1–1.4) complete, starting Phase 2
 
 ### Notes
 
-- Feature has 4 plan files, 14 tasks total, 3 complete.
+- Feature has 4 plan files, 14 tasks total, 4 complete (Phase 1 done).
 - Dev/verification environment: `docker-compose.yml` + `Dockerfile` using
-  `serversideup/php:8.5-cli` / `8.5-fpm-nginx`, with `intl` and `pcov`
-  extensions added. Run via `docker compose exec cli <command>` (CLI/tests)
-  or `docker compose up -d web` + `http://localhost:8080` (browser checks).
-- Root cause found and fixed (user edited local `.env`, not committed):
-  `CI_ENVIRONMENT` was commented out, so CI4 defaulted to `production`, which
-  put BladeOne in `MODE_FAST` — it never compiles views, only reads an
-  already-compiled `.bladec` file, so every page 500'd with "Failed to open
-  stream" on the cache file. Set `CI_ENVIRONMENT = development` locally.
-- Task 1.3 verified via `curl` (page loads 200, pinned `htmx@2.0.10` and
-  `alpinejs@3.16.2` script tags present in `<head>`) — the Chrome extension
-  browser tool was disconnected on the user's end, so the devtools
-  `window.Alpine`/`window.htmx` console check from the plan wasn't run live.
+  `serversideup/php:8.5-cli` / `8.5-fpm-nginx`, `intl` + `pcov` extensions.
+  `docker compose exec cli <command>` for CLI/tests, `http://localhost:8080`
+  for browser checks (needs `docker compose up -d web`).
+- Local `.env` needed `CI_ENVIRONMENT = development` uncommented — see task
+  1.3 notes in git history for why (BladeOne MODE_FAST issue).
+- `Classic` controller skeleton done: `GET /classic` renders a placeholder
+  view, `POST /classic/keys/{list,create,delete,delete-all,migrate}` all
+  stub to `[]` JSON. Full suite: 10/10 passing.
+- Task 2.1 needs `OutlineService::listKeys()` (merges Access Keys +
+  transfer-metrics endpoints) and a `formatBytes()` helper, then wires
+  `Classic::listKeys()` for real. Verification plan wants a feature test
+  with a faked `OutlineService` injected via `Services::injectMock`.
 
 ## Up Next
 
-- Phase 2 (02-key-operations.md): list/create/delete/delete-all key endpoints
-- Phase 3 (03-migrate.md): migrate batch endpoint
-- Phase 4 (04-ui.md): Classic Manager view
+- 2.2: Create key
+- 2.3: Delete key
+- 2.4: Delete all keys
 
 ## Blockers
 
