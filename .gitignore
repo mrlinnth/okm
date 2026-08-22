@@ -112,6 +112,9 @@ _modules/*
 /dist/
 /nbdist/
 /nbactions.xml
+
+# PHPUnit
+.phpunit.result.cache
 /nb-configuration.xml
 /.nb-gradle/
 
