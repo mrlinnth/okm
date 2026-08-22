@@ -58,7 +58,7 @@ response reflects the requested name.
 
 ---
 
-### Task [2.3]: Delete key
+### Task [2.3]: Delete key [DONE]
 
 #### Subtasks
 

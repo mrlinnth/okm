@@ -29,14 +29,14 @@ class OutlineService
      */
     public function listKeys(string $apiUrl): array
     {
-        $keysResponse = $this->request('GET', $apiUrl, '/access-keys');
+        $accessKeys = $this->fetchAccessKeys($apiUrl);
         $metricsResponse = $this->request('GET', $apiUrl, '/metrics/transfer');
 
         $usageByKeyId = $metricsResponse['bytesTransferredByUserId'] ?? [];
 
         $keys = [];
 
-        foreach ($keysResponse['accessKeys'] ?? [] as $key) {
+        foreach ($accessKeys as $key) {
             $bytesUsed = (int) ($usageByKeyId[$key['id']] ?? 0);
 
             $keys[] = [
@@ -71,6 +71,36 @@ class OutlineService
             'bytesUsed' => 0,
             'usage' => $this->formatBytes(0),
         ];
+    }
+
+    /**
+     * Deletes a key by name — re-resolves the key's Outline ID from the
+     * current server list rather than assuming a cached ID.
+     */
+    public function deleteKey(string $apiUrl, string $name): void
+    {
+        $id = $this->resolveKeyIdByName($apiUrl, $name);
+
+        $this->request('DELETE', $apiUrl, "/access-keys/{$id}");
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function fetchAccessKeys(string $apiUrl): array
+    {
+        return $this->request('GET', $apiUrl, '/access-keys')['accessKeys'] ?? [];
+    }
+
+    protected function resolveKeyIdByName(string $apiUrl, string $name): string
+    {
+        foreach ($this->fetchAccessKeys($apiUrl) as $key) {
+            if (($key['name'] ?? null) === $name) {
+                return (string) $key['id'];
+            }
+        }
+
+        throw new OutlineRequestException("No key named \"{$name}\" was found.");
     }
 
     /**

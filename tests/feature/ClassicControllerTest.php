@@ -102,4 +102,49 @@ final class ClassicControllerTest extends CIUnitTestCase
 
         $result->assertStatus(422);
     }
+
+    public function testDeleteKeyReturnsSuccess(): void
+    {
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public function deleteKey(string $apiUrl, string $name): void
+            {
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/delete', [
+            'apiUrl' => 'https://203.0.113.10/api',
+            'name' => 'bob',
+        ]);
+
+        $result->assertStatus(200);
+        $this->assertTrue(json_decode($result->getJSON(), true)['success']);
+    }
+
+    public function testDeleteKeyReturns502WhenNameNotFound(): void
+    {
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public function deleteKey(string $apiUrl, string $name): void
+            {
+                throw new OutlineRequestException('No key named "ghost" was found.');
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/delete', [
+            'apiUrl' => 'https://203.0.113.10/api',
+            'name' => 'ghost',
+        ]);
+
+        $result->assertStatus(502);
+        $result->assertJSONFragment(['error' => 'No key named "ghost" was found.']);
+    }
 }

@@ -118,6 +118,37 @@ final class OutlineServiceTest extends CIUnitTestCase
         $this->assertSame(json_encode(['name' => 'new-key']), $service->capturedCurlOptionsQueue[1][CURLOPT_POSTFIELDS]);
     }
 
+    public function testDeleteKeyResolvesIdByNameThenDeletes(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            ['status' => 200, 'body' => json_encode(['accessKeys' => [
+                ['id' => '1', 'name' => 'alice'],
+                ['id' => '2', 'name' => 'bob'],
+            ]]), 'error' => null],
+            ['status' => 204, 'body' => '', 'error' => null],
+        ];
+
+        $service->deleteKey('https://203.0.113.10', 'bob');
+
+        $this->assertStringEndsWith('/access-keys', $service->capturedCurlOptionsQueue[0][CURLOPT_URL]);
+        $this->assertSame('DELETE', $service->capturedCurlOptionsQueue[1][CURLOPT_CUSTOMREQUEST]);
+        $this->assertStringEndsWith('/access-keys/2', $service->capturedCurlOptionsQueue[1][CURLOPT_URL]);
+    }
+
+    public function testDeleteKeyThrowsWhenNameNotFound(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            ['status' => 200, 'body' => json_encode(['accessKeys' => [['id' => '1', 'name' => 'alice']]]), 'error' => null],
+        ];
+
+        $this->expectException(OutlineRequestException::class);
+        $this->expectExceptionMessage('No key named "ghost" was found.');
+
+        $service->deleteKey('https://203.0.113.10', 'ghost');
+    }
+
     /**
      * @dataProvider provideFormatBytesCases
      */
