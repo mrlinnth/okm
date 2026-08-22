@@ -2,40 +2,42 @@
 
 ## Current
 
-- **Feature**: classic-key-manager
-- **Task**: 4.1 (Classic Manager view scaffold) — not yet started
+- **Feature**: classic-key-manager — all 14 tasks complete
 - **Branch**: feature-classic-key-manager
-- **Started**: 2026-08-22
-- **Status**: Backend complete (Phases 1-3, tasks 1.1-3.2). Paused before
-  Phase 4 (UI) to check in with the user — see Notes.
+- **Status**: Implementation done. Needs manual verification against a real
+  Outline server before merge (see Notes).
 
 ### Notes
 
-- Feature has 4 plan files, 14 tasks total, 10 complete. Full suite: 37/37
-  passing (`docker compose exec cli vendor/bin/phpunit`).
-- `OutlineService::migrateKeys()` does the reachability check via `listKeys()`
-  (dual purpose: confirms destination is up + gets existing names in one
-  call), resolves collisions via `resolveUniqueName()`, continues past
-  per-key failures, supports `onlyNames` for retry. `Classic::migrate()`
-  wires it up with the same requireString/errorResponse validation pattern.
-- Phase 4 (4.1-4.4) is frontend-only: one large `app/Views/classic/index.blade.php`
-  rewrite implementing the two-panel workspace from `ai/prototype/index.html`
-  with Alpine `x-data`. Its own verification steps are manual/visual
-  ("paste a real Outline server JSON, confirm...") — no real or mock Outline
-  server is available in this environment to test end-to-end against.
+- All 4 plan files, 14/14 tasks `[DONE]`. Backend: 37/37 phpunit tests
+  passing. Frontend: `app/Views/classic/index.blade.php` implements the full
+  two-panel workspace from `ai/prototype/index.html`'s Classic Manager
+  screen, restyled with daisyUI (card/btn/modal/textarea) instead of the
+  prototype's raw Tailwind, wired to the real `/classic/keys/*` endpoints
+  via `fetch()` (no mocked data).
+- No real/mock Outline server is available in this environment, and the
+  Chrome browser tool was disconnected throughout, so Phase 4's own
+  "paste real server JSON in a browser" verification steps were not run
+  live. Instead: (a) `GET /classic` verified 200 via `curl` and the feature
+  test suite, (b) the Alpine `classicManager()` factory extracted and run
+  under Node with a stubbed `fetch` exercising the full golden path —
+  connect, create, delete, delete-all (partial failure), migrate (induced
+  failure + name collision), and retry-merge (confirms retry replaces only
+  the previously-failed entries, matching by `renamed_from ?? name`, leaving
+  prior successes untouched). All assertions passed.
+- **User should verify against a real Outline server before merging**:
+  connect both panels, create/copy/delete a key, delete-all with multiple
+  keys, migrate with an intentional name collision, retry a failed migrate.
 - Dev environment: `docker-compose.yml` + `Dockerfile` (serversideup/php 8.5,
   intl + pcov). `docker compose exec cli vendor/bin/phpunit` for tests,
-  `docker compose up -d web` + `http://localhost:8080` for browser checks.
+  `docker compose up -d web` + `http://localhost:8080/classic` to try it live.
   Local `.env` needs `CI_ENVIRONMENT = development` (not committed).
 
 ## Up Next
 
-- 4.1: Classic Manager view scaffold (two-panel layout, connect handlers)
-- 4.2: Key list, copy, and create
-- 4.3: Delete, delete-all, and results
-- 4.4: Migrate, retry, and start over
+- User manual verification against a real Outline server (see Notes)
+- Then: PR, local merge to develop, or leave as-is (task-runner default)
 
 ## Blockers
 
-- Phase 4 verification needs a real or mock Outline server to test against
-  end-to-end — none available in this environment.
+- None — feature implementation complete, pending manual sign-off
