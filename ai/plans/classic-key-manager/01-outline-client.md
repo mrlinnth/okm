@@ -1,6 +1,6 @@
 # Phase 1: Outline Client & Frontend Foundation
 
-### Task [1.1]: Outline config
+### Task [1.1]: Outline config [DONE]
 
 #### Subtasks
 
@@ -8,7 +8,7 @@
       `BaseConfig` pattern): `public int $timeout = 10` (seconds, matches
       current app's 10s Outline timeout), `public array $blockedRanges` listing
       the always-blocked CIDR ranges (unspecified/loopback `0.0.0.0/8,
-    127.0.0.0/8`, link-local `169.254.0.0/16`, cloud metadata
+  127.0.0.0/8`, link-local `169.254.0.0/16`, cloud metadata
       `169.254.169.254/32`, multicast `224.0.0.0/4`, reserved `240.0.0.0/4`,
       plus IPv6 equivalents `::1/128`, `fe80::/10`, `ff00::/8`).
 - [ ] Do not add an `SSRF_BLOCK_PRIVATE`-style toggle for RFC1918/CGNAT/ULA
@@ -33,7 +33,7 @@
       call, since each classic-mode request supplies its own server JSON —
       do not read a fixed endpoint from config.
 - [ ] Implement a protected method (e.g. `request(string $method, string
-    $apiUrl, string $path, ?array $json = null): array`) that: rejects any
+  $apiUrl, string $path, ?array $json = null): array`) that: rejects any
       `$apiUrl` not starting with `https://`; resolves the host via DNS
       (`dns_get_record` or `gethostbyname`) before connecting; rejects if the
       resolved IP falls in any range from `Config\Outline::$blockedRanges`;
@@ -113,7 +113,7 @@ console errors.
       later tasks.
 - [ ] Register routes in `app/Config/Routes.php`: `GET /classic` →
       `Classic::index`, and `POST /classic/keys/{list,create,delete,
-    delete-all,migrate}` → the corresponding methods.
+  delete-all,migrate}` → the corresponding methods.
 
 #### Key Files
 
