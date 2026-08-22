@@ -106,7 +106,27 @@ class Classic extends WebController
 
     public function migrate(): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        $body = $this->request->getJSON(true) ?? [];
+
+        $sourceKeys = $body['sourceKeys'] ?? null;
+        if (!is_array($sourceKeys)) {
+            return $this->errorResponse(422, 'sourceKeys is required.');
+        }
+
+        $destApiUrl = $this->requireString($body, 'destApiUrl');
+        if ($destApiUrl === null) {
+            return $this->errorResponse(422, 'destApiUrl is required.');
+        }
+
+        $onlyNames = is_array($body['onlyNames'] ?? null) ? $body['onlyNames'] : [];
+
+        try {
+            $results = Services::outline()->migrateKeys($sourceKeys, $destApiUrl, $onlyNames);
+        } catch (OutlineRequestException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
+
+        return $this->response->setJSON($results);
     }
 
     private function requireString(array $body, string $key): ?string

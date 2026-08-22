@@ -177,4 +177,63 @@ final class ClassicControllerTest extends CIUnitTestCase
         $this->assertSame(1, $decoded['failed']);
         $this->assertSame('boom', $decoded['results'][1]['error']);
     }
+
+    public function testMigrateReturnsPerKeyResults(): void
+    {
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public array $capturedOnlyNames = [];
+
+            public function migrateKeys(array $sourceKeys, string $destApiUrl, array $onlyNames = []): array
+            {
+                $this->capturedOnlyNames = $onlyNames;
+
+                return [['name' => 'alice', 'status' => 'success', 'accessUrl' => 'ss://one']];
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/migrate', [
+            'sourceKeys' => [['name' => 'alice']],
+            'destApiUrl' => 'https://203.0.113.20/api',
+            'onlyNames' => ['alice'],
+        ]);
+
+        $result->assertStatus(200);
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame('success', $decoded[0]['status']);
+        $this->assertSame(['alice'], $fake->capturedOnlyNames);
+    }
+
+    public function testMigrateRejectsMissingSourceKeys(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/classic/keys/migrate', ['destApiUrl' => 'https://203.0.113.20/api']);
+
+        $result->assertStatus(422);
+    }
+
+    public function testMigrateReturns502WhenDestinationUnreachable(): void
+    {
+        $fake = new class extends OutlineService {
+            public function __construct()
+            {
+            }
+
+            public function migrateKeys(array $sourceKeys, string $destApiUrl, array $onlyNames = []): array
+            {
+                throw new OutlineRequestException('Could not resolve host: dest.example');
+            }
+        };
+        Services::injectMock('outline', $fake);
+
+        $result = $this->withBodyFormat('json')->post('/classic/keys/migrate', [
+            'sourceKeys' => [['name' => 'alice']],
+            'destApiUrl' => 'https://203.0.113.20/api',
+        ]);
+
+        $result->assertStatus(502);
+    }
 }

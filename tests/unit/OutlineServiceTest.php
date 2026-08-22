@@ -177,6 +177,74 @@ final class OutlineServiceTest extends CIUnitTestCase
         );
     }
 
+    public function testMigrateKeysContinuesOnFailureAndResolvesCollisions(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            // listKeys(dest): existing "carol" already there
+            ['status' => 200, 'body' => json_encode(['accessKeys' => [
+                ['id' => 'd1', 'name' => 'carol', 'accessUrl' => 'ss://carol'],
+            ]]), 'error' => null],
+            ['status' => 200, 'body' => json_encode(['bytesTransferredByUserId' => []]), 'error' => null],
+            // createKey(alice): no collision
+            ['status' => 200, 'body' => json_encode(['id' => '1', 'accessUrl' => 'ss://one']), 'error' => null],
+            ['status' => 204, 'body' => '', 'error' => null],
+            // createKey(carol -> carol_2): collides with existing dest name
+            ['status' => 200, 'body' => json_encode(['id' => '2', 'accessUrl' => 'ss://two']), 'error' => null],
+            ['status' => 204, 'body' => '', 'error' => null],
+            // createKey(dave): fails
+            ['status' => 500, 'body' => 'server error', 'error' => null],
+        ];
+
+        $results = $service->migrateKeys(
+            [['name' => 'alice'], ['name' => 'carol'], ['name' => 'dave']],
+            'https://203.0.113.20',
+        );
+
+        $this->assertSame([
+            ['name' => 'alice', 'status' => 'success', 'accessUrl' => 'ss://one'],
+            ['name' => 'carol_2', 'status' => 'success', 'accessUrl' => 'ss://two', 'renamed_from' => 'carol'],
+            ['name' => 'dave', 'status' => 'failed', 'error' => 'Outline API returned HTTP 500: server error'],
+        ], $results);
+    }
+
+    public function testMigrateKeysOnlyNamesRestrictsToRetriedKeys(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            ['status' => 200, 'body' => json_encode(['accessKeys' => [
+                ['id' => 'd1', 'name' => 'alice', 'accessUrl' => 'ss://a'],
+                ['id' => 'd2', 'name' => 'carol_2', 'accessUrl' => 'ss://c'],
+            ]]), 'error' => null],
+            ['status' => 200, 'body' => json_encode(['bytesTransferredByUserId' => []]), 'error' => null],
+            // createKey(dave): now succeeds
+            ['status' => 200, 'body' => json_encode(['id' => '3', 'accessUrl' => 'ss://three']), 'error' => null],
+            ['status' => 204, 'body' => '', 'error' => null],
+        ];
+
+        $results = $service->migrateKeys(
+            [['name' => 'alice'], ['name' => 'carol'], ['name' => 'dave']],
+            'https://203.0.113.20',
+            ['dave'],
+        );
+
+        $this->assertSame([
+            ['name' => 'dave', 'status' => 'success', 'accessUrl' => 'ss://three'],
+        ], $results);
+    }
+
+    public function testMigrateKeysThrowsWhenDestinationUnreachable(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponseQueue = [
+            ['status' => 0, 'body' => '', 'error' => 'Could not resolve host'],
+        ];
+
+        $this->expectException(OutlineRequestException::class);
+
+        $service->migrateKeys([['name' => 'alice']], 'https://203.0.113.20');
+    }
+
     /**
      * @dataProvider provideResolveUniqueNameCases
      */

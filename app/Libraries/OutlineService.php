@@ -112,6 +112,54 @@ class OutlineService
     }
 
     /**
+     * Migrates $sourceKeys to the destination server, resolving name
+     * collisions and continuing past individual failures. When $onlyNames
+     * is non-empty (a retry), only source keys with those names are
+     * processed.
+     *
+     * @param array<int, array{name: string}> $sourceKeys
+     * @param array<int, string> $onlyNames
+     * @return array<int, array{name: string, status: string, renamed_from?: string, accessUrl?: string, error?: string}>
+     */
+    public function migrateKeys(array $sourceKeys, string $destApiUrl, array $onlyNames = []): array
+    {
+        // Reachability check happens as a side effect of fetching the
+        // destination's existing names — one call serves both purposes.
+        $existingNames = array_column($this->listKeys($destApiUrl), 'name');
+
+        $keysToProcess = $onlyNames === []
+            ? $sourceKeys
+            : array_values(array_filter(
+                $sourceKeys,
+                static fn (array $key): bool => in_array($key['name'] ?? null, $onlyNames, true),
+            ));
+
+        $reservedInBatch = [];
+        $results = [];
+
+        foreach ($keysToProcess as $sourceKey) {
+            $requestedName = (string) ($sourceKey['name'] ?? '');
+            $uniqueName = $this->resolveUniqueName($requestedName, $existingNames, $reservedInBatch);
+            $reservedInBatch[] = $uniqueName;
+
+            try {
+                $created = $this->createKey($destApiUrl, $uniqueName);
+
+                $result = ['name' => $uniqueName, 'status' => 'success', 'accessUrl' => $created['accessUrl']];
+                if ($uniqueName !== $requestedName) {
+                    $result['renamed_from'] = $requestedName;
+                }
+
+                $results[] = $result;
+            } catch (OutlineRequestException $e) {
+                $results[] = ['name' => $requestedName, 'status' => 'failed', 'error' => $e->getMessage()];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * Resolves $requested to a name unique against both $existingNames and
      * $reservedInBatch, appending `_2`, `_3`, ... as needed. Pure — no I/O,
      * so it's usable both for migrate's destination check and unit tests.
