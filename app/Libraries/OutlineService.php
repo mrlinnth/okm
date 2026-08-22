@@ -112,6 +112,31 @@ class OutlineService
     }
 
     /**
+     * Resolves $requested to a name unique against both $existingNames and
+     * $reservedInBatch, appending `_2`, `_3`, ... as needed. Pure — no I/O,
+     * so it's usable both for migrate's destination check and unit tests.
+     *
+     * @param array<int, string> $existingNames
+     * @param array<int, string> $reservedInBatch
+     */
+    public function resolveUniqueName(string $requested, array $existingNames, array $reservedInBatch = []): string
+    {
+        $taken = array_flip(array_merge($existingNames, $reservedInBatch));
+
+        if (!isset($taken[$requested])) {
+            return $requested;
+        }
+
+        $suffix = 2;
+
+        while (isset($taken["{$requested}_{$suffix}"])) {
+            $suffix++;
+        }
+
+        return "{$requested}_{$suffix}";
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     protected function fetchAccessKeys(string $apiUrl): array

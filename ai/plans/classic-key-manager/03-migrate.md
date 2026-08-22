@@ -2,13 +2,13 @@
 
 Depends on: Phase 2 (`OutlineService::createKey`, `listKeys`).
 
-### Task [3.1]: Duplicate-name suffix resolution
+### Task [3.1]: Duplicate-name suffix resolution [DONE]
 
 #### Subtasks
 
 - [ ] Add a pure, easily-unit-testable method — e.g.
       `OutlineService::resolveUniqueName(string $requested, array
-    $existingNames, array $reservedInBatch): string` — that returns
+  $existingNames, array $reservedInBatch): string` — that returns
       `$requested` unchanged if it doesn't collide with `$existingNames` or
       `$reservedInBatch`, otherwise appends `_2`, `_3`, ... (underscore,
       matching the current app exactly — confirmed in
@@ -34,7 +34,7 @@ colliding with `$reservedInBatch` (not yet created on the destination).
 #### Subtasks
 
 - [ ] Add `OutlineService::migrateKeys(array $sourceKeys, string
-    $destApiUrl, array $onlyNames = []): array`. `$sourceKeys` is the
+  $destApiUrl, array $onlyNames = []): array`. `$sourceKeys` is the
       already-loaded source key list (name required per key); `$onlyNames`,
       when non-empty, restricts processing to those names (used by retry).
       Behavior: - Check the destination is reachable (a `listKeys()` call) before any
@@ -44,7 +44,7 @@ colliding with `$reservedInBatch` (not yet created on the destination).
       `resolveUniqueName()` (tracking names reserved within this batch as
       it goes), create the key on the destination via `createKey()`. - Continue past individual failures — never let one exception stop
       the batch. - Return per-key results: `{name, status: 'success'|'failed',
-      renamed_from?, accessUrl?, error?}`.
+    renamed_from?, accessUrl?, error?}`.
 - [ ] Implement `Classic::migrate()`: validate `sourceKeys` (array) and
       `destApiUrl` (string) from POST body; optional `onlyNames` (array) for
       retry; call `migrateKeys()`; return the full results JSON.

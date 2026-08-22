@@ -178,6 +178,24 @@ final class OutlineServiceTest extends CIUnitTestCase
     }
 
     /**
+     * @dataProvider provideResolveUniqueNameCases
+     */
+    public function testResolveUniqueName(string $requested, array $existingNames, array $reservedInBatch, string $expected): void
+    {
+        $service = new TestableOutlineService();
+
+        $this->assertSame($expected, $service->resolveUniqueName($requested, $existingNames, $reservedInBatch));
+    }
+
+    public static function provideResolveUniqueNameCases(): iterable
+    {
+        yield 'no collision' => ['alice', ['bob'], [], 'alice'];
+        yield 'single collision' => ['alice', ['alice'], [], 'alice_2'];
+        yield 'multiple prior collisions' => ['alice', ['alice', 'alice_2', 'alice_3'], [], 'alice_4'];
+        yield 'collides only with reserved-in-batch' => ['alice', [], ['alice'], 'alice_2'];
+    }
+
+    /**
      * @dataProvider provideFormatBytesCases
      */
     public function testFormatBytes(int $bytes, string $expected): void
