@@ -13,7 +13,7 @@ use Config\Services;
 /**
  * WebController
  *
- * Base controller for all HTML pages (Home, About, Blog, etc.)
+ * Base controller for all HTML pages (e.g. Classic Manager)
  * Handles initialization of CMS and View engine
  *
  * All web pages should extend this controller instead of BaseController

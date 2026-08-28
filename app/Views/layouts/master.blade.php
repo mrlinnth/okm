@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'CI4 + Cockpit CMS Starter')</title>
+    <title>@yield('title', 'Outline Key Manager')</title>
     <link href="/css/output.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.16.2/dist/cdn.min.js"></script>
@@ -14,14 +14,11 @@
 <body class="min-h-screen flex flex-col">
     <header class="navbar bg-base-300 shadow-lg">
         <div class="flex-1">
-            <a href="/" class="btn btn-ghost text-xl font-bold">CI4 + Cockpit</a>
+            <a href="/" class="btn btn-ghost text-xl font-bold">Outline Key Manager</a>
         </div>
         <div class="flex-none items-center gap-2 hidden md:flex">
             <ul class="menu menu-horizontal px-1">
-                <li><a href="/">Home</a></li>
-                <li><a href="/about">About</a></li>
-                <li><a href="/blog">Blog</a></li>
-                <li><a href="/products">Products</a></li>
+                <li><a href="/classic">Classic Manager</a></li>
             </ul>
             <label class="swap swap-rotate btn btn-ghost btn-circle">
                 <input type="checkbox" id="theme-toggle" />
@@ -41,10 +38,7 @@
                     </svg>
                 </label>
                 <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-1 p-2 shadow bg-base-100 rounded-box w-52">
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/about">About</a></li>
-                    <li><a href="/blog">Blog</a></li>
-                    <li><a href="/products">Products</a></li>
+                    <li><a href="/classic">Classic Manager</a></li>
                     <li>
                         <label class="swap swap-rotate">
                             <input type="checkbox" id="theme-toggle-mobile" />
@@ -67,7 +61,7 @@
 
     <footer class="footer footer-center p-4 bg-base-300 text-base-content">
         <aside>
-            <p>&copy; {{ date('Y') }} CI4 Cockpit Starter | Powered by Blade Templating & daisyUI</p>
+            <p>&copy; {{ date('Y') }} Outline Key Manager</p>
         </aside>
     </footer>
 

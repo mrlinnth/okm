@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
  *
  * Extend this class in any new controllers:
  * ```
- *     class Home extends BaseController
+ *     class Classic extends BaseController
  * ```
  *
  * For security, be sure to declare any new methods as protected or private.
