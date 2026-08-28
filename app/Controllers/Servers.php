@@ -117,6 +117,53 @@ class Servers extends WebController
         return $this->response->setJSON($this->presentServer($server));
     }
 
+    /**
+     * Reconciliation diff for the Sync now modal — live Outline keys vs.
+     * this server's ledger records.
+     */
+    public function sync(string $id): ResponseInterface
+    {
+        try {
+            $diff = Services::savedServers()->diffServer($id);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(404, $e->getMessage());
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
+
+        return $this->response->setJSON($diff);
+    }
+
+    /**
+     * Resolve the "found on server" section: create a subscription per
+     * pasted key, honouring optional `key_name: date` lines.
+     */
+    public function syncImport(string $id): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+        $keys = is_array($body['keys'] ?? null) ? $body['keys'] : [];
+        $pastedText = is_string($body['pastedText'] ?? null) ? $body['pastedText'] : '';
+
+        $results = Services::subscriptions()->resolveFoundOnServer($id, $keys, $pastedText);
+
+        return $this->response->setJSON(['results' => $results]);
+    }
+
+    /**
+     * Resolve one "missing on server" row: drop the stale Cockpit record
+     * (its Outline key is already gone).
+     */
+    public function syncRemove(string $id): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+        $subscriptionId = $this->requireString($body, 'subscriptionId');
+        if ($subscriptionId === null) {
+            return $this->errorResponse(422, 'subscriptionId is required.');
+        }
+
+        return $this->response->setJSON(['success' => Services::subscriptions()->removeRecord($subscriptionId)]);
+    }
+
     public function delete(string $id): ResponseInterface
     {
         $subscriptionCount = Services::subscriptions()->countByServer($id);

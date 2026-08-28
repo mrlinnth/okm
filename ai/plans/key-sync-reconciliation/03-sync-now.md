@@ -2,7 +2,7 @@
 
 Depends on: Phase 1 (`diffServer()`, `createFromOutlineKey()`).
 
-### Task [3.1]: Diff endpoint
+### Task [3.1]: Diff endpoint [DONE]
 
 #### Subtasks
 
@@ -23,7 +23,7 @@ sections correctly shaped for the modal.
 
 ---
 
-### Task [3.2]: Resolve "found on server" section
+### Task [3.2]: Resolve "found on server" section [DONE]
 
 #### Subtasks
 
@@ -59,7 +59,7 @@ date line falls back to the default rather than erroring; one induced
 
 ---
 
-### Task [3.3]: Resolve "missing on server" section
+### Task [3.3]: Resolve "missing on server" section [DONE]
 
 #### Subtasks
 

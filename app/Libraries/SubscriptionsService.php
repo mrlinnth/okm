@@ -109,6 +109,85 @@ class SubscriptionsService
     }
 
     /**
+     * Resolve the "found on server" section of a sync diff into
+     * subscriptions. `$pastedText` carries optional `key_name: date` lines;
+     * a key with a matched, valid, today-or-future date uses it, everything
+     * else uses the 1-month default term. Continues past individual
+     * failures.
+     *
+     * @param array<int, array<string, mixed>> $keys  the diff's foundOnServer list
+     * @return array<int, array{name: string, status: string, expiryDate?: string, error?: string}>
+     */
+    public function resolveFoundOnServer(string $serverId, array $keys, string $pastedText): array
+    {
+        $pastedDates = $this->parsePastedDates($pastedText);
+        $defaultExpiry = self::addMonthsClamped($this->today(), 1);
+        $results = [];
+
+        foreach ($keys as $key) {
+            $name = (string) ($key['name'] ?? '');
+            $expiry = $defaultExpiry;
+
+            if (isset($pastedDates[$name])) {
+                try {
+                    $parsed = (new \DateTimeImmutable($pastedDates[$name]))->setTime(0, 0);
+                    if ($parsed >= $this->today()) {
+                        $expiry = $parsed;
+                    }
+                } catch (\Exception $e) {
+                    // Malformed date line — fall back to the default term.
+                }
+            }
+
+            try {
+                $this->createFromOutlineKey($serverId, $key, $expiry);
+                $results[] = ['name' => $name, 'status' => 'resolved', 'expiryDate' => $expiry->format('Y-m-d')];
+            } catch (\Throwable $e) {
+                $results[] = ['name' => $name, 'status' => 'failed', 'error' => $e->getMessage()];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Delete a subscription's Cockpit record only — no Outline call. Used
+     * to resolve a "missing on server" diff row, where the key is already
+     * confirmed absent.
+     */
+    public function removeRecord(string $id): bool
+    {
+        return $this->cockpit->deleteItem('subscriptions', $id);
+    }
+
+    /**
+     * Parse `key_name: date` lines into a name => raw-date map. Tolerates
+     * surrounding whitespace; ignores blank and colon-less lines.
+     *
+     * @return array<string, string>
+     */
+    private function parsePastedDates(string $text): array
+    {
+        $dates = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $text) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || ! str_contains($line, ':')) {
+                continue;
+            }
+
+            [$name, $date] = explode(':', $line, 2);
+            $name = trim($name);
+
+            if ($name !== '') {
+                $dates[$name] = trim($date);
+            }
+        }
+
+        return $dates;
+    }
+
+    /**
      * Active subscriptions whose expiry is more than the configured grace
      * period in the past — the records the expiry job should process.
      *

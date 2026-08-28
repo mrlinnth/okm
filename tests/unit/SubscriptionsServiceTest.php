@@ -182,6 +182,52 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         $this->assertSame('bad', $summary['failures'][0]['name']);
     }
 
+    public function testResolveFoundOnServerAppliesPastedDatesWithDefaultFallback(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function createItem(string $model, array $data): ?array
+            {
+                return $data['keyName'] === 'boom' ? null : array_merge(['_id' => 'sub'], $data);
+            }
+        };
+        $service = new class ($cockpit) extends SubscriptionsService {
+            public function __construct(CockpitService $cockpit) { parent::__construct($cockpit); }
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable('2026-08-28'); }
+        };
+
+        $keys = [
+            ['id' => 'k1', 'name' => 'matched', 'accessUrl' => 'ss://1'],
+            ['id' => 'k2', 'name' => 'nodate', 'accessUrl' => 'ss://2'],
+            ['id' => 'k3', 'name' => 'malformed', 'accessUrl' => 'ss://3'],
+            ['id' => 'k4', 'name' => 'past', 'accessUrl' => 'ss://4'],
+            ['id' => 'k5', 'name' => 'boom', 'accessUrl' => 'ss://5'],
+        ];
+        $pasted = "matched: 2026-12-01\nmalformed: not-a-date\npast: 2020-01-01\nignored line without colon\n";
+
+        $results = $service->resolveFoundOnServer('srv-1', $keys, $pasted);
+        $default = SubscriptionsService::addMonthsClamped(new \DateTimeImmutable('2026-08-28'), 1)->format('Y-m-d');
+
+        $this->assertSame(['matched', 'resolved', '2026-12-01'], [$results[0]['name'], $results[0]['status'], $results[0]['expiryDate']]);
+        $this->assertSame($default, $results[1]['expiryDate']);
+        $this->assertSame($default, $results[2]['expiryDate']);
+        $this->assertSame($default, $results[3]['expiryDate']);
+        $this->assertSame('failed', $results[4]['status']);
+        $this->assertCount(5, $results);
+    }
+
+    public function testRemoveRecordDeletesOnlyTheCockpitRecord(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $deleted = [];
+            public function __construct() {}
+            public function deleteItem(string $model, string $id): bool { $this->deleted = [$model, $id]; return true; }
+        };
+
+        $this->assertTrue((new SubscriptionsService($cockpit))->removeRecord('sub-1'));
+        $this->assertSame(['subscriptions', 'sub-1'], $cockpit->deleted);
+    }
+
     public function testProcessExpiryDeletesTheKeyAndMarksExpiredOnSuccess(): void
     {
         $cockpit = new class extends CockpitService {

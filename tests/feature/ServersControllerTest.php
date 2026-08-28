@@ -29,6 +29,17 @@ final class FakeSavedServers extends SavedServersService
 
     public ?\Throwable $createThrows = null;
 
+    /** @var array{foundOnServer: array<int, mixed>, missingOnServer: array<int, mixed>} */
+    public array $diff = ['foundOnServer' => [], 'missingOnServer' => []];
+
+    public ?\Throwable $diffThrows = null;
+
+    /** @var array<int, array{0: string, 1: string}> */
+    public array $migrateArgs = [];
+
+    /** @var array{results: array<int, mixed>, moved: int, failed: int} */
+    public array $migrateResult = ['results' => [], 'moved' => 0, 'failed' => 0];
+
     public function __construct()
     {
     }
@@ -36,6 +47,22 @@ final class FakeSavedServers extends SavedServersService
     public function list(): array
     {
         return $this->rows;
+    }
+
+    public function diffServer(string $serverId): array
+    {
+        if ($this->diffThrows !== null) {
+            throw $this->diffThrows;
+        }
+
+        return $this->diff;
+    }
+
+    public function migrate(string $sourceId, string $destinationId): array
+    {
+        $this->migrateArgs[] = [$sourceId, $destinationId];
+
+        return $this->migrateResult;
     }
 
     public function create(string $label, string $serverJson, ?string $publicHost): array
@@ -104,6 +131,29 @@ final class FakeSubscriptionsForServers extends SubscriptionsService
         $this->importArgs[] = [$serverId, $apiUrl, $expiryDate->format('Y-m-d')];
 
         return $this->importSummary;
+    }
+
+    /** @var array<int, array{0: string, 1: array<int, mixed>, 2: string}> */
+    public array $resolveFoundArgs = [];
+
+    /** @var array<int, mixed> */
+    public array $resolveFoundResults = [];
+
+    /** @var array<int, string> */
+    public array $removeRecordArgs = [];
+
+    public function resolveFoundOnServer(string $serverId, array $keys, string $pastedText): array
+    {
+        $this->resolveFoundArgs[] = [$serverId, $keys, $pastedText];
+
+        return $this->resolveFoundResults;
+    }
+
+    public function removeRecord(string $id): bool
+    {
+        $this->removeRecordArgs[] = $id;
+
+        return true;
     }
 }
 
@@ -280,6 +330,70 @@ final class ServersControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
         $this->assertSame(['srv-9', false], $this->servers->setActiveArgs[0]);
         $this->assertFalse(json_decode($result->getJSON(), true)['active']);
+    }
+
+    // --- Phase 3: sync now ----------------------------------------
+
+    public function testSyncReturnsBothDiffSections(): void
+    {
+        $this->servers->diff = [
+            'foundOnServer'   => [['id' => 'k-x', 'name' => 'manual', 'accessUrl' => 'ss://x']],
+            'missingOnServer' => [['_id' => 'sub-stale', 'outlineKeyId' => 'gone']],
+        ];
+
+        $result = $this->post('/servers/srv-1/sync');
+
+        $result->assertStatus(200);
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame('manual', $decoded['foundOnServer'][0]['name']);
+        $this->assertSame('sub-stale', $decoded['missingOnServer'][0]['_id']);
+    }
+
+    public function testSyncReturns502WhenTheServerCannotBeReached(): void
+    {
+        $this->servers->diffThrows = new \App\Libraries\OutlineRequestException('Outline request failed: timeout');
+
+        $result = $this->post('/servers/srv-1/sync');
+
+        $result->assertStatus(502);
+    }
+
+    public function testSyncImportDelegatesKeysAndPastedTextAndReturnsResults(): void
+    {
+        $this->subscriptions->resolveFoundResults = [
+            ['name' => 'manual', 'status' => 'resolved', 'expiryDate' => '2026-10-01'],
+        ];
+
+        $result = $this->withBodyFormat('json')->post('/servers/srv-1/sync/import', [
+            'keys'       => [['id' => 'k-x', 'name' => 'manual', 'accessUrl' => 'ss://x']],
+            'pastedText' => "manual: 2026-10-01\n",
+        ]);
+
+        $result->assertStatus(200);
+        [$serverId, $keys, $pasted] = $this->subscriptions->resolveFoundArgs[0];
+        $this->assertSame('srv-1', $serverId);
+        $this->assertSame('manual', $keys[0]['name']);
+        $this->assertSame("manual: 2026-10-01\n", $pasted);
+        $this->assertSame('resolved', json_decode($result->getJSON(), true)['results'][0]['status']);
+    }
+
+    public function testSyncRemoveDeletesTheRecordWithNoOutlineCall(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/servers/srv-1/sync/remove', [
+            'subscriptionId' => 'sub-stale',
+        ]);
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-stale'], $this->subscriptions->removeRecordArgs);
+        $this->assertTrue(json_decode($result->getJSON(), true)['success']);
+    }
+
+    public function testSyncRemoveRejectsAMissingSubscriptionId(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/servers/srv-1/sync/remove', []);
+
+        $result->assertStatus(422);
+        $this->assertSame([], $this->subscriptions->removeRecordArgs);
     }
 
     // --- Task 2.4: delete ------------------------------------------
