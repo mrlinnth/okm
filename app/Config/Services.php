@@ -78,4 +78,19 @@ class Services extends BaseService
 
         return new \App\Libraries\OutlineService();
     }
+
+    /**
+     * Saved Servers Registry Service
+     *
+     * @param bool $getShared
+     * @return \App\Libraries\SavedServersService
+     */
+    public static function savedServers(bool $getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('savedServers');
+        }
+
+        return new \App\Libraries\SavedServersService();
+    }
 }
