@@ -84,6 +84,20 @@
         <div class="modal-backdrop" @click="showAdd = false"></div>
     </div>
 
+    {{-- Delete confirm --}}
+    <div x-show="deleteTarget" x-cloak class="modal modal-open">
+        <div class="modal-box max-w-sm">
+            <h3 class="font-semibold">Delete saved server?</h3>
+            <p class="mt-1 text-sm text-base-content/60" x-text="deleteTarget ? 'This removes ' + deleteTarget.label + ' from the registry.' : ''"></p>
+            <p x-show="deleteError" x-text="deleteError" class="mt-2 text-xs text-error"></p>
+            <div class="modal-action">
+                <button @click="deleteTarget = null" class="btn btn-ghost flex-1">Cancel</button>
+                <button @click="confirmDelete()" :disabled="deleting" class="btn btn-error flex-1" x-text="deleting ? 'Deleting…' : 'Delete'"></button>
+            </div>
+        </div>
+        <div class="modal-backdrop" @click="deleteTarget = null"></div>
+    </div>
+
 </div>
 
 <script>
@@ -95,6 +109,10 @@
             form: { label: '', publicHost: '', json: '' },
             addError: '',
             adding: false,
+
+            deleteTarget: null,
+            deleteError: '',
+            deleting: false,
 
             displayHost(srv) {
                 if (srv.publicHost) return srv.publicHost;
@@ -165,11 +183,41 @@
             },
 
             async toggleActive(srv) {
-                // Immediate toggle wired in task 3.3.
+                const action = srv.active ? 'deactivate' : 'activate';
+                srv.busy = true;
+                try {
+                    const response = await fetch(`/servers/${srv.id}/${action}`, { method: 'POST' });
+                    if (response.ok) {
+                        const updated = await response.json();
+                        srv.active = updated.active;
+                    }
+                } finally {
+                    srv.busy = false;
+                }
             },
 
             askDelete(srv) {
-                // Delete confirm modal wired in task 3.3.
+                this.deleteError = '';
+                this.deleteTarget = srv;
+            },
+
+            async confirmDelete() {
+                const target = this.deleteTarget;
+                this.deleting = true;
+                try {
+                    const response = await fetch(`/servers/${target.id}/delete`, { method: 'POST' });
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        this.servers = this.servers.filter(s => s.id !== target.id);
+                        this.deleteTarget = null;
+                    } else {
+                        this.deleteError = 'Failed to delete server.';
+                    }
+                } catch (e) {
+                    this.deleteError = 'Failed to delete server.';
+                } finally {
+                    this.deleting = false;
+                }
             },
         };
     }

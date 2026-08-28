@@ -2,67 +2,66 @@
 
 ## Current
 
-- **Feature**: saved-servers-registry
-- **Task**: 3.1 (Grid scaffold and server card) — Phase 3
-- **Branch**: feature-servers-crud-endpoints
-- **Started**: 2026-08-28
-- **Status**: Phases 1 + 2 complete. Next: Phase 3 frontend UI.
+- **Feature**: saved-servers-registry — **all 10 tasks `[DONE]` (Phases 1–3)**
+- **Branch**: feature-servers-ui
+- **Status**: Complete and verified live against real Cockpit. Ready to merge.
 
 ### Notes
 
 - **classic-key-manager**: 14/14 `[DONE]`, merged. Wants a live Outline
   sign-off, not blocking.
-- **Phase 1 — saved-servers-registry:** `CockpitService` write layer
-  (1.1, `CockpitServiceTest`), `SavedServersService` (1.2,
-  `SavedServersServiceTest`), `Servers` controller skeleton + routes + a
-  placeholder view (1.3, `ServersControllerTest`).
-- **Phase 2 — CRUD endpoints (all `[DONE]`):**
-  - **2.1** `Servers::index` maps raw Cockpit items to a trimmed shape via
-    `presentServer()` (`id`, `label`, `apiUrl`, `publicHost`, `active`) —
-    `serverJson` never reaches the page or any JSON response.
-  - **2.2** `Servers::store` — manual validation (`label`/`serverJson`
-    required, `publicHost` optional), delegates to
-    `SavedServersService::create`. Catches `InvalidServerJsonException` /
-    `ServerUnreachableException` separately → 422 with the exception's own
-    message (distinct). Private `requireString` / `errorResponse` helpers
-    mirror the Classic controller.
-  - **2.3** `Servers::activate` / `deactivate` → private `updateActive()` →
-    `SavedServersService::setActive($id, bool)`, returns the trimmed record.
-    502 if the Cockpit write fails.
-  - **2.4** `Servers::delete` → `SavedServersService::delete($id)`, returns
-    `{success: bool}`. No `subCount` guard (deferred to Subscription ledger).
-  - `tests/feature/ServersControllerTest.php` — 10 tests, `FakeSavedServers`
-    in-memory stand-in. Cache invalidation itself is covered by
-    `CockpitServiceTest` (Phase 1), not re-tested here.
-  - Live-smoke-checked the 3 store error paths: missing label / bad JSON /
-    unreachable all return 422 with distinct messages.
-- Full suite: **68/68 green**.
 
-- **UNVERIFIED against live Cockpit** — `.env` has placeholder creds; the
-  `servers` collection does not exist on `cms.hiyan.xyz`. Assumed Cockpit v2
-  write shapes (see `CockpitService` docblocks). All Phase 1/2 code is
-  tested against fakes, so this blocks only the end-to-end manual pass.
-- **Prereq for Phase 3 manual verification:** create the Cockpit `servers`
-  collection (schema in `ai/plans/saved-servers-registry/requirements.md`)
-  and set real Cockpit creds in `.env`.
+- **saved-servers-registry — done:**
+  - **Phase 1** — `CockpitService` write layer (`createItem`/`updateItem`/
+    `deleteItem` + `sendWrite()` seam), `SavedServersService`
+    (`parseServerJson`/`checkReachable`/`create`/`setActive`/`delete`/`list`,
+    two exception types), `Servers` controller skeleton + `/servers*` routes.
+  - **Phase 2** — CRUD endpoints. `index` trims records via `presentServer()`
+    (`serverJson` never leaves the server). `store` returns distinct 422s for
+    bad JSON vs unreachable. `activate`/`deactivate` → `setActive`. `delete`
+    → `{success}`.
+  - **Phase 3** — `app/Views/servers/index.blade.php`: daisyUI grid of server
+    cards (label / host / active|inactive badge / Activate-Deactivate +
+    Delete), Add Server modal (client-side loose validation, POST `/servers`,
+    inline 422 message), Delete confirm modal. Alpine `savedServers()` factory
+    seeded from the controller list; `displayHost()` shows `publicHost` or the
+    apiUrl host (never the full secret URL path).
+  - Tests: `CockpitServiceTest` (7), `SavedServersServiceTest` (14),
+    `ServersControllerTest` (10). Full suite **68/68 green**.
 
-### CSS build caveat (not part of this feature)
+- **VERIFIED LIVE against `cms.hiyan.xyz`** (after the user fixed the API
+  token — the placeholder was rejected with 412):
+  - Cockpit write layer: create → update (partial, `_id`-merged) → delete,
+    plus cache invalidation (list reflects each write immediately). The
+    assumed Cockpit v2 shapes were correct: `POST /api/content/item/{model}`
+    body `{data:{...}}` (update carries `_id`), `DELETE .../{id}`.
+  - `/servers` endpoints end-to-end via curl: deactivate/activate/delete all
+    200, list updates without manual cache clear.
+  - Temp `spark cockpit:smoke` / `servers:seed` commands used for this were
+    removed; no demo rows left in Cockpit.
 
-- `npm run watch:css` runs elsewhere; Tailwind v4 auto-scans the whole repo,
-  so `public/css/output.css` occasionally rides along in commits. Scope via
-  `@source` in `public/css/input.css` — separate chore.
+- **Not yet done manually**: the browser walkthrough of the Add Server modal
+  with a _real_ Outline server JSON (exercises the reachability check + card
+  append in the UI). The Chrome tool was unavailable this session. Endpoint
+  behavior for that path is unit/curl-tested; only the in-browser Alpine
+  wiring is unconfirmed.
+
+### CSS build caveat
+
+- `npm run watch:css` elsewhere + Tailwind v4 whole-repo scan → occasional
+  `public/css/output.css` churn in commits. Scope via `@source` — separate
+  chore.
 
 ## Up Next
 
-- 3.1: `app/Views/servers/index.blade.php` — replace the placeholder with the
-  real grid (header + "Add server", 1-col mobile / 2-col tablet+ cards:
-  label, host, status badge, action row). Root Alpine `x-data` seeded from
-  the controller's server list.
-- 3.2: Add server modal (label / public host / JSON textarea, client-side
-  loose validation, POST `/servers`, distinct inline errors on 422).
-- 3.3: Activate/deactivate (immediate fetch, no confirm) + Delete (daisyUI
-  confirm modal).
+- Merge `feature-servers-ui` to develop.
+- Optional: browser walkthrough of Add Server with a real Outline JSON.
+- Next feature (per PRD priority + deps): **subscription-ledger** (depends on
+  saved-servers-registry, now done). 18 tasks across 5 phases.
+  Other candidates: key-sync-reconciliation, recipient-public-page,
+  automated-expiry-job — all also depend on subscription-ledger except
+  key-sync (depends on saved-servers only).
 
 ## Blockers
 
-- None. Live-Cockpit confirmation deferred to Phase 3 manual verification.
+- None.
