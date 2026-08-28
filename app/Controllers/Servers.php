@@ -105,8 +105,14 @@ class Servers extends WebController
 
     public function delete(string $id): ResponseInterface
     {
-        // No subscription-count guard in this feature — nothing can
-        // reference a server yet. Subscription ledger wires that in later.
+        $subscriptionCount = Services::subscriptions()->countByServer($id);
+        if ($subscriptionCount > 0) {
+            return $this->errorResponse(
+                422,
+                "Cannot delete a server with {$subscriptionCount} active subscriptions — deactivate it instead.",
+            );
+        }
+
         $deleted = Services::savedServers()->delete($id);
 
         return $this->response->setJSON(['success' => $deleted]);

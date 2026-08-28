@@ -1,6 +1,7 @@
 <?php
 
 use App\Libraries\SavedServersService;
+use App\Libraries\SubscriptionsService;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
@@ -79,18 +80,34 @@ final class FakeSavedServers extends SavedServersService
 /**
  * @internal
  */
+final class FakeSubscriptionsForServers extends SubscriptionsService
+{
+    public int $count = 0;
+
+    public function countByServer(string $serverId): int
+    {
+        return $this->count;
+    }
+}
+
+/**
+ * @internal
+ */
 final class ServersControllerTest extends CIUnitTestCase
 {
     use FeatureTestTrait;
 
     private FakeSavedServers $servers;
+    private FakeSubscriptionsForServers $subscriptions;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->servers = new FakeSavedServers();
+        $this->subscriptions = new FakeSubscriptionsForServers();
         Services::injectMock('savedServers', $this->servers);
+        Services::injectMock('subscriptions', $this->subscriptions);
     }
 
     protected function tearDown(): void
@@ -229,5 +246,16 @@ final class ServersControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
         $this->assertSame(['srv-9'], $this->servers->deleteArgs);
         $this->assertTrue(json_decode($result->getJSON(), true)['success']);
+    }
+
+    public function testDeleteRejectsServerWithSubscriptionsWithoutCallingDelete(): void
+    {
+        $this->subscriptions->count = 2;
+
+        $result = $this->post('/servers/srv-9/delete');
+
+        $result->assertStatus(422);
+        $result->assertJSONFragment(['error' => 'Cannot delete a server with 2 active subscriptions — deactivate it instead.']);
+        $this->assertSame([], $this->servers->deleteArgs);
     }
 }

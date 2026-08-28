@@ -3,7 +3,7 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 1.4 (Saved Servers delete guard)
+- **Task**: 2.1 (List endpoint)
 - **Branch**: feature-subscription-ledger-foundation
 - **Started**: 2026-08-28
 - **Status**: Implementing Phase 1 service foundation
@@ -19,12 +19,16 @@
   as 32 lowercase hexadecimal characters.
 - Task 1.3 is complete: the `/subscriptions` controller, route contract,
   service registration, and placeholder view are ready for later phases.
+- Task 1.4 is complete: saved servers with linked subscriptions return a 422
+  response instead of being deleted.
 - Docker verification passed: focused date-helper tests (4/4) and full suite
   (72/72).
 
 ## Up Next
 
-- 1.4: Saved Servers delete guard
+- 2.1: List endpoint
+- 2.2: Create subscription
+- 2.3: Edit recipient and key name
 
 ## Blockers
 

@@ -10,6 +10,18 @@ namespace App\Libraries;
 class SubscriptionsService
 {
     /**
+     * Count subscriptions assigned to a saved Outline server.
+     */
+    public function countByServer(string $serverId): int
+    {
+        $cockpit = \Config\Services::cockpit();
+
+        return count($cockpit->getCollectionCached('subscriptions', [
+            'filter' => ['serverId' => $serverId],
+        ]));
+    }
+
+    /**
      * Generate the immutable, URL-safe token used in recipient share links.
      */
     public static function generateToken(): string

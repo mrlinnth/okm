@@ -86,7 +86,7 @@ generations, no duplicates).
 
 ---
 
-### Task [1.4]: Wire the Saved Servers delete guard
+### Task [1.4]: Wire the Saved Servers delete guard [DONE]
 
 #### Subtasks
 
