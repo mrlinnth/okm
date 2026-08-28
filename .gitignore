@@ -137,3 +137,7 @@ _modules/*
 
 # Files for AI
 TODO.md
+# Editor swap files
+*.swp
+*.swo
+.*.swp

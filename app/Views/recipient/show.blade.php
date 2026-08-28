@@ -9,11 +9,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.16.2/dist/cdn.min.js"></script>
 </head>
 <body class="min-h-screen bg-base-200 text-base-content">
-    <header class="border-b border-base-300 bg-base-100 px-5 py-4">
-        <p class="mx-auto max-w-md text-sm font-bold tracking-[0.18em]">OKM</p>
-    </header>
-
-    <main class="mx-auto flex min-h-[calc(100vh-57px)] w-full max-w-md items-center px-5 py-10">
+    <main class="mx-auto flex min-h-screen w-full max-w-md items-center px-5 py-10">
         <section lang="my" class="w-full rounded-box border border-base-300 bg-base-100 p-6 text-center shadow-xl shadow-base-300/30 sm:p-8">
             @if ($state === 'active' && $subscription !== null)
                 <div x-data="{ copied: false }">
