@@ -54,12 +54,47 @@
         </p>
     </div>
 
+    {{-- Add server modal --}}
+    <div x-show="showAdd" x-cloak class="modal modal-open">
+        <div class="modal-box max-w-sm">
+            <h3 class="font-semibold">Add saved server</h3>
+
+            <div class="mt-3 space-y-3">
+                <div>
+                    <label class="label label-text text-xs">Label</label>
+                    <input type="text" x-model="form.label" placeholder="e.g. Contabo SG" class="input input-bordered w-full" @keydown.enter="submitAdd()">
+                </div>
+                <div>
+                    <label class="label label-text text-xs">Public host <span class="text-base-content/40">(optional)</span></label>
+                    <input type="text" x-model="form.publicHost" placeholder="e.g. vpn1.example.com" class="input input-bordered w-full">
+                </div>
+                <div>
+                    <label class="label label-text text-xs">Server JSON</label>
+                    <textarea x-model="form.json" rows="3" placeholder='{"apiUrl": "https://...", "certSha256": "..."}' class="textarea textarea-bordered w-full font-mono text-sm"></textarea>
+                </div>
+            </div>
+
+            <p x-show="addError" x-text="addError" class="mt-2 text-xs text-error"></p>
+
+            <div class="modal-action">
+                <button @click="showAdd = false" class="btn btn-ghost flex-1">Cancel</button>
+                <button @click="submitAdd()" :disabled="adding" class="btn btn-neutral flex-1" x-text="adding ? 'Saving…' : 'Save'"></button>
+            </div>
+        </div>
+        <div class="modal-backdrop" @click="showAdd = false"></div>
+    </div>
+
 </div>
 
 <script>
     function savedServers() {
         return {
             servers: {!! json_encode($servers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!},
+
+            showAdd: false,
+            form: { label: '', publicHost: '', json: '' },
+            addError: '',
+            adding: false,
 
             displayHost(srv) {
                 if (srv.publicHost) return srv.publicHost;
@@ -70,8 +105,63 @@
                 }
             },
 
+            // Loose validation, matching Classic key manager's Connect check.
+            parseApiUrl(jsonText) {
+                let parsed;
+                try {
+                    parsed = JSON.parse(jsonText);
+                } catch (e) {
+                    return null;
+                }
+                if (!parsed || typeof parsed.apiUrl !== 'string' || !parsed.apiUrl.startsWith('https://')) {
+                    return null;
+                }
+                return parsed.apiUrl;
+            },
+
             openAdd() {
-                // Add server modal is wired in task 3.2.
+                this.form = { label: '', publicHost: '', json: '' };
+                this.addError = '';
+                this.showAdd = true;
+            },
+
+            async submitAdd() {
+                if (!this.form.label.trim()) {
+                    this.addError = 'Label is required.';
+                    return;
+                }
+                if (!this.parseApiUrl(this.form.json)) {
+                    this.addError = 'Invalid server JSON — must include an https apiUrl.';
+                    return;
+                }
+
+                this.addError = '';
+                this.adding = true;
+                try {
+                    const response = await fetch('/servers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            label: this.form.label.trim(),
+                            serverJson: this.form.json,
+                            publicHost: this.form.publicHost.trim() || null,
+                        }),
+                    });
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        // 422 carries the specific reason — invalid JSON vs unreachable.
+                        this.addError = data.error || 'Failed to add server.';
+                        return;
+                    }
+
+                    this.servers.push(data);
+                    this.showAdd = false;
+                } catch (e) {
+                    this.addError = 'Failed to add server.';
+                } finally {
+                    this.adding = false;
+                }
             },
 
             async toggleActive(srv) {

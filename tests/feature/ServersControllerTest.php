@@ -117,9 +117,10 @@ final class ServersControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
         $result->assertSee('HK-1');
         $result->assertSee('vpn.example.com');
-        // The full credential blob must never reach the page.
-        $result->assertDontSee('serverJson');
+        // The stored credential blob must never reach the page — check the
+        // cert value and the raw serverJson string, both unique to the blob.
         $result->assertDontSee('TOPSECRETCERT');
+        $result->assertDontSee('"certSha256":"TOPSECRETCERT"');
     }
 
     // --- Task 2.2: add server endpoint -------------------------------
