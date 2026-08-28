@@ -64,25 +64,25 @@
     </div>
 
     {{-- Add server modal --}}
-    <div x-show="showAdd" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': showAdd }">
         <div class="modal-box max-w-sm">
             <template x-if="!importSummary">
                 <div>
                     <h3 class="font-semibold">Add saved server</h3>
 
                     <div class="mt-3 space-y-3">
-                        <div>
-                            <label class="label label-text text-xs">Label</label>
-                            <input type="text" x-model="form.label" placeholder="e.g. Contabo SG" class="input input-bordered w-full" @keydown.enter="submitAdd()">
-                        </div>
-                        <div>
-                            <label class="label label-text text-xs">Public host <span class="text-base-content/40">(optional)</span></label>
-                            <input type="text" x-model="form.publicHost" placeholder="e.g. vpn1.example.com" class="input input-bordered w-full">
-                        </div>
-                        <div>
-                            <label class="label label-text text-xs">Server JSON</label>
-                            <textarea x-model="form.json" rows="3" placeholder='{"apiUrl": "https://...", "certSha256": "..."}' class="textarea textarea-bordered w-full font-mono text-sm"></textarea>
-                        </div>
+                        <fieldset class="fieldset">
+                            <legend class="fieldset-legend">Label</legend>
+                            <input type="text" x-model="form.label" placeholder="e.g. Contabo SG" class="input w-full" @keydown.enter="submitAdd()">
+                        </fieldset>
+                        <fieldset class="fieldset">
+                            <legend class="fieldset-legend">Public host <span class="font-normal text-base-content/40">(optional)</span></legend>
+                            <input type="text" x-model="form.publicHost" placeholder="e.g. vpn1.example.com" class="input w-full">
+                        </fieldset>
+                        <fieldset class="fieldset">
+                            <legend class="fieldset-legend">Server JSON</legend>
+                            <textarea x-model="form.json" rows="3" placeholder='{"apiUrl": "https://...", "certSha256": "..."}' class="textarea w-full font-mono text-sm"></textarea>
+                        </fieldset>
                     </div>
 
                     <p x-show="addError" x-text="addError" class="mt-2 text-xs text-error"></p>
@@ -121,7 +121,7 @@
     </div>
 
     {{-- Sync now modal --}}
-    <div x-show="syncTarget" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': syncTarget }">
         <div class="modal-box max-w-lg">
             <h3 class="font-semibold">
                 Sync now <span class="text-base-content/50" x-text="syncTarget ? '· ' + syncTarget.label : ''"></span>
@@ -153,7 +153,7 @@
                             x-model="pastedText"
                             rows="3"
                             placeholder="Optional — one per line:&#10;alice-key: 2026-12-01"
-                            class="textarea textarea-bordered mt-2 w-full font-mono text-xs"
+                            class="textarea mt-2 w-full font-mono text-xs"
                         ></textarea>
                         <button @click="resolveFound()" :disabled="syncBusy" class="btn btn-neutral btn-sm mt-2"
                             x-text="syncBusy ? 'Importing…' : 'Import as subscriptions'"></button>
@@ -189,7 +189,7 @@
     </div>
 
     {{-- Migrate modal --}}
-    <div x-show="migrateTarget" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': migrateTarget }">
         <div class="modal-box max-w-lg">
             <h3 class="font-semibold">
                 Migrate <span class="text-base-content/50" x-text="migrateTarget ? '· ' + migrateTarget.label : ''"></span>
@@ -200,13 +200,15 @@
 
             <template x-if="!migrateResults">
                 <div>
-                    <label class="label label-text mt-3 text-xs">Destination server</label>
-                    <select x-model="migrateDest" class="select select-bordered w-full">
-                        <option value="">Select a destination…</option>
-                        <template x-for="opt in migrateDestinations()" :key="opt.id">
-                            <option :value="opt.id" x-text="opt.label"></option>
-                        </template>
-                    </select>
+                    <fieldset class="fieldset mt-3">
+                        <legend class="fieldset-legend">Destination server</legend>
+                        <select x-model="migrateDest" class="select w-full">
+                            <option value="">Select a destination…</option>
+                            <template x-for="opt in migrateDestinations()" :key="opt.id">
+                                <option :value="opt.id" x-text="opt.label"></option>
+                            </template>
+                        </select>
+                    </fieldset>
                     <p x-show="migrateError" x-text="migrateError" class="mt-2 text-xs text-error"></p>
                     <div class="modal-action">
                         <button @click="closeMigrate()" class="btn btn-ghost flex-1">Cancel</button>
@@ -246,7 +248,7 @@
     </div>
 
     {{-- Delete confirm --}}
-    <div x-show="deleteTarget" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': deleteTarget }">
         <div class="modal-box max-w-sm">
             <h3 class="font-semibold">Delete saved server?</h3>
             <p class="mt-1 text-sm text-base-content/60" x-text="deleteTarget ? 'This removes ' + deleteTarget.label + ' from the registry.' : ''"></p>

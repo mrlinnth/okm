@@ -5,7 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Outline Key Manager')</title>
-    <link href="/css/output.css" rel="stylesheet">
+    {{-- Cache-bust the stylesheet: it is served `immutable` with a 1-year TTL,
+         so without a version marker CSS changes never reach a returning visitor. --}}
+    @php($cssVersion = (defined('FCPATH') && is_file(FCPATH . 'css/output.css')) ? filemtime(FCPATH . 'css/output.css') : '1')
+    <link href="/css/output.css?v={{ $cssVersion }}" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.16.2/dist/cdn.min.js"></script>
     @if (session()->get('adminAuthenticated') === true)

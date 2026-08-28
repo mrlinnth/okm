@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title }}</title>
-    <link href="/css/output.css" rel="stylesheet">
+    @php($cssVersion = (defined('FCPATH') && is_file(FCPATH . 'css/output.css')) ? filemtime(FCPATH . 'css/output.css') : '1')
+    <link href="/css/output.css?v={{ $cssVersion }}" rel="stylesheet">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.16.2/dist/cdn.min.js"></script>
 </head>
 <body class="min-h-screen bg-base-200 text-base-content">

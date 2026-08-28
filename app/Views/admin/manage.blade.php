@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title }} · Outline Key Manager</title>
-    <link href="/css/output.css" rel="stylesheet">
+    @php($cssVersion = (defined('FCPATH') && is_file(FCPATH . 'css/output.css')) ? filemtime(FCPATH . 'css/output.css') : '1')
+    <link href="/css/output.css?v={{ $cssVersion }}" rel="stylesheet">
 </head>
 <body class="min-h-screen bg-base-200">
     <main class="mx-auto flex min-h-screen max-w-md items-center px-4 py-10">
@@ -18,7 +19,7 @@
                     {!! csrf_field() !!}
                     <div class="flex flex-col gap-1.5">
                         <label for="password" class="text-sm font-medium">Password</label>
-                        <input id="password" name="password" type="password" autocomplete="current-password" required autofocus class="input input-bordered w-full" />
+                        <input id="password" name="password" type="password" autocomplete="current-password" required autofocus class="input w-full" />
                     </div>
                     @if ($error)
                         <p class="text-sm text-error">{{ $error }}</p>

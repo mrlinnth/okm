@@ -19,7 +19,7 @@
 
                 <template x-if="!current.connected">
                     <div class="mt-2">
-                        <textarea x-model="current.json" rows="4" placeholder='Paste server JSON, e.g. {"apiUrl": "https://...", "certSha256": "..."}' class="textarea textarea-bordered w-full font-mono text-sm"></textarea>
+                        <textarea x-model="current.json" rows="4" placeholder='Paste server JSON, e.g. {"apiUrl": "https://...", "certSha256": "..."}' class="textarea w-full font-mono text-sm"></textarea>
                         <p x-show="current.error" x-text="current.error" class="mt-1 text-xs text-error"></p>
                         <button @click="connectCurrent()" :disabled="current.loading" class="btn btn-neutral btn-block mt-3" x-text="current.loading ? 'Connecting…' : 'Connect'"></button>
                     </div>
@@ -77,7 +77,7 @@
 
                 <template x-if="current.connected && !migrateTo.connected">
                     <div class="mt-2">
-                        <textarea x-model="migrateTo.json" rows="4" placeholder="Paste destination server JSON" class="textarea textarea-bordered w-full font-mono text-sm"></textarea>
+                        <textarea x-model="migrateTo.json" rows="4" placeholder="Paste destination server JSON" class="textarea w-full font-mono text-sm"></textarea>
                         <p x-show="migrateTo.error" x-text="migrateTo.error" class="mt-1 text-xs text-error"></p>
                         <button @click="connectMigrateTo()" :disabled="migrateTo.loading" class="btn btn-neutral btn-block mt-3" x-text="migrateTo.loading ? 'Connecting…' : 'Connect'"></button>
                     </div>
@@ -127,10 +127,10 @@
     </div>
 
     {{-- Create key modal --}}
-    <div x-show="showCreateKey" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': showCreateKey }">
         <div class="modal-box max-w-sm">
             <h3 class="font-semibold">Create key</h3>
-            <input type="text" x-model="newKeyName" placeholder="Key name" class="input input-bordered w-full mt-3" @keydown.enter="createKey()">
+            <input type="text" x-model="newKeyName" placeholder="Key name" class="input w-full mt-3" @keydown.enter="createKey()">
             <p x-show="createError" x-text="createError" class="mt-1 text-xs text-error"></p>
             <div class="modal-action">
                 <button @click="showCreateKey = false; newKeyName = ''; createError = ''" class="btn btn-ghost flex-1">Cancel</button>
@@ -141,7 +141,7 @@
     </div>
 
     {{-- Delete one key confirm --}}
-    <div x-show="deleteTarget" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': deleteTarget }">
         <div class="modal-box max-w-sm">
             <h3 class="font-semibold">Delete key?</h3>
             <p class="mt-1 text-sm text-base-content/60" x-text="deleteTarget ? 'This permanently deletes ' + deleteTarget.name + '.' : ''"></p>
@@ -154,7 +154,7 @@
     </div>
 
     {{-- Delete all confirm / result --}}
-    <div x-show="showDeleteAll || deleteAllResult" x-cloak class="modal modal-open">
+    <div x-cloak class="modal" :class="{ 'modal-open': showDeleteAll || deleteAllResult }">
         <div class="modal-box max-w-sm">
             <template x-if="showDeleteAll && !deleteAllResult">
                 <div>
