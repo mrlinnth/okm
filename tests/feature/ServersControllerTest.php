@@ -122,13 +122,77 @@ final class ServersControllerTest extends CIUnitTestCase
         $result->assertDontSee('TOPSECRETCERT');
     }
 
-    // --- Task 2.2: add server endpoint (stub until implemented) --------
+    // --- Task 2.2: add server endpoint -------------------------------
 
-    public function testStoreStub(): void
+    public function testStoreCreatesServerFromValidInput(): void
     {
-        $result = $this->withBodyFormat('json')->post('/servers', ['label' => 'x', 'serverJson' => '{}']);
+        $json = '{"apiUrl":"https://vpn.example.com/x"}';
+
+        $result = $this->withBodyFormat('json')->post('/servers', [
+            'label'      => 'HK-1',
+            'serverJson' => $json,
+            'publicHost' => 'vpn.example.com',
+        ]);
 
         $result->assertStatus(200);
+        $this->assertSame(['HK-1', $json, 'vpn.example.com'], $this->servers->createArgs[0]);
+
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame('new-id', $decoded['id']);
+        $this->assertSame('HK-1', $decoded['label']);
+        $this->assertArrayNotHasKey('serverJson', $decoded);
+    }
+
+    public function testStorePassesNullPublicHostWhenOmitted(): void
+    {
+        $this->withBodyFormat('json')->post('/servers', [
+            'label'      => 'HK-1',
+            'serverJson' => '{"apiUrl":"https://vpn.example.com/x"}',
+        ]);
+
+        $this->assertNull($this->servers->createArgs[0][2]);
+    }
+
+    public function testStoreRejectsMissingLabelWithoutCallingCreate(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/servers', ['serverJson' => '{}']);
+
+        $result->assertStatus(422);
+        $this->assertSame([], $this->servers->createArgs);
+    }
+
+    public function testStoreRejectsMissingServerJsonWithoutCallingCreate(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/servers', ['label' => 'HK-1']);
+
+        $result->assertStatus(422);
+        $this->assertSame([], $this->servers->createArgs);
+    }
+
+    public function testStoreReturns422WithInvalidJsonMessage(): void
+    {
+        $this->servers->createThrows = new \App\Libraries\InvalidServerJsonException('Server JSON could not be parsed.');
+
+        $result = $this->withBodyFormat('json')->post('/servers', [
+            'label'      => 'HK-1',
+            'serverJson' => 'not json',
+        ]);
+
+        $result->assertStatus(422);
+        $result->assertJSONFragment(['error' => 'Server JSON could not be parsed.']);
+    }
+
+    public function testStoreReturns422WithDistinctUnreachableMessage(): void
+    {
+        $this->servers->createThrows = new \App\Libraries\ServerUnreachableException('Could not reach the Outline server at https://vpn.example.com/x.');
+
+        $result = $this->withBodyFormat('json')->post('/servers', [
+            'label'      => 'HK-1',
+            'serverJson' => '{"apiUrl":"https://vpn.example.com/x"}',
+        ]);
+
+        $result->assertStatus(422);
+        $result->assertJSONFragment(['error' => 'Could not reach the Outline server at https://vpn.example.com/x.']);
     }
 
     // --- Tasks 2.3 / 2.4: stubs until implemented ---------------------

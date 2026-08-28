@@ -25,7 +25,7 @@ servers returned by a faked `SavedServersService::list()`.
 
 ---
 
-### Task [2.2]: Add server endpoint
+### Task [2.2]: Add server endpoint [DONE]
 
 #### Subtasks
 
@@ -56,7 +56,7 @@ attempted when validation fails first (faked `SavedServersService` asserts
 #### Subtasks
 
 - [ ] Implement `Servers::activate(string $id)` and `Servers::deactivate
-  (string $id)`: call `SavedServersService::setActive($id, true|false)`,
+(string $id)`: call `SavedServersService::setActive($id, true|false)`,
       return the updated record as JSON. No confirmation needed
       server-side (matches immediate-toggle UX from requirements).
 

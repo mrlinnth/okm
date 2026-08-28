@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Libraries\InvalidServerJsonException;
+use App\Libraries\ServerUnreachableException;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
 
@@ -32,7 +34,28 @@ class Servers extends WebController
 
     public function store(): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        $body = $this->request->getJSON(true) ?? [];
+
+        $label = $this->requireString($body, 'label');
+        if ($label === null) {
+            return $this->errorResponse(422, 'label is required.');
+        }
+
+        $serverJson = $this->requireString($body, 'serverJson');
+        if ($serverJson === null) {
+            return $this->errorResponse(422, 'serverJson is required.');
+        }
+
+        $publicHost = $this->requireString($body, 'publicHost');
+
+        try {
+            $server = Services::savedServers()->create($label, $serverJson, $publicHost);
+        } catch (InvalidServerJsonException | ServerUnreachableException $e) {
+            // Distinct messages preserved — the UI shows why it failed.
+            return $this->errorResponse(422, $e->getMessage());
+        }
+
+        return $this->response->setJSON($this->presentServer($server));
     }
 
     /**
@@ -67,5 +90,20 @@ class Servers extends WebController
     public function delete(string $id): ResponseInterface
     {
         return $this->response->setJSON([]);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function requireString(array $body, string $key): ?string
+    {
+        $value = $body[$key] ?? null;
+
+        return (is_string($value) && $value !== '') ? $value : null;
+    }
+
+    private function errorResponse(int $status, string $message): ResponseInterface
+    {
+        return $this->response->setStatusCode($status)->setJSON(['error' => $message]);
     }
 }
