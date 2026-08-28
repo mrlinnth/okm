@@ -68,7 +68,7 @@ data — confirms no information leak via status code.
 
 ---
 
-### Task [1.3]: View — Myanmar recipient page, all states
+### Task [1.3]: View — Myanmar recipient page, all states [DONE]
 
 #### Subtasks
 
