@@ -26,6 +26,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
             public int $listCalls = 0;
             public array $createArgs = [];
             public array $renameArgs = [];
+            public array $extendArgs = [];
 
             public function __construct()
             {
@@ -50,6 +51,13 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->renameArgs = [$id, $recipientName, $keyName];
 
                 return ['_id' => $id, 'recipientName' => $recipientName, 'keyName' => $keyName];
+            }
+
+            public function extend(string $id): array
+            {
+                $this->extendArgs = [$id];
+
+                return ['_id' => $id, 'expiryDate' => '2026-09-28'];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -111,5 +119,14 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 
         $result->assertStatus(200);
         $this->assertSame(['sub-1', 'Alice Updated', 'alice-key-updated'], $this->subscriptions->renameArgs);
+    }
+
+    public function testExtendPassesSubscriptionToService(): void
+    {
+        $result = $this->post('/subscriptions/sub-1/extend');
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1'], $this->subscriptions->extendArgs);
+        $result->assertJSONFragment(['expiryDate' => '2026-09-28']);
     }
 }

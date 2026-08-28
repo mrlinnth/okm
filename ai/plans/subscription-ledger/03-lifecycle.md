@@ -3,7 +3,7 @@
 Depends on: Phase 2 (`SubscriptionsService` create/read, `Subscriptions`
 controller).
 
-### Task [3.1]: Extend
+### Task [3.1]: Extend [DONE]
 
 #### Subtasks
 

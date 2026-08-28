@@ -103,6 +103,40 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         $this->assertSame(['soon', 'middle', 'late'], array_column($subscriptions, '_id'));
     }
 
+    /**
+     * @dataProvider extendCases
+     */
+    public function testExtendAddsOneMonthFromTheLaterOfTodayAndCurrentExpiry(string $today, string $expiry, string $expected): void
+    {
+        $cockpit = new class($expiry) extends CockpitService {
+            public array $update = [];
+
+            public function __construct(private string $expiry) {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'expiryDate' => $this->expiry]; }
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $service = new class($cockpit, new SavedServersService(), new OutlineService(), $today) extends SubscriptionsService {
+            public function __construct(CockpitService $cockpit, SavedServersService $servers, OutlineService $outline, private string $currentDate) { parent::__construct($cockpit, $servers, $outline); }
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable($this->currentDate); }
+        };
+
+        $service->extend('sub-1');
+
+        $this->assertSame(['expiryDate' => $expected], $cockpit->update);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function extendCases(): array
+    {
+        return [
+            'future expiry' => ['2025-01-15', '2025-03-31', '2025-04-30'],
+            'expired subscription' => ['2025-01-31', '2025-01-01', '2025-02-28'],
+            'month-end expiry' => ['2024-01-01', '2024-01-31', '2024-02-29'],
+        ];
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

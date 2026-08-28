@@ -125,6 +125,29 @@ class SubscriptionsService
     }
 
     /**
+     * Extend a subscription from whichever date is later: today or its
+     * current expiry date.
+     *
+     * @return array<string, mixed>
+     */
+    public function extend(string $id): array
+    {
+        $subscription = $this->findSubscription($id);
+        $today = $this->today();
+        $currentExpiry = new \DateTimeImmutable((string) $subscription['expiryDate']);
+        $baseDate = $currentExpiry > $today ? $currentExpiry : $today;
+
+        $updated = $this->cockpit->updateItem('subscriptions', $id, [
+            'expiryDate' => self::addMonthsClamped($baseDate, 1)->format('Y-m-d'),
+        ]);
+        if ($updated === null) {
+            throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+        }
+
+        return $updated;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array
@@ -142,6 +165,19 @@ class SubscriptionsService
         }
 
         throw new \InvalidArgumentException('The selected server was not found.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function findSubscription(string $id): array
+    {
+        $subscription = $this->cockpit->getItemCached('subscriptions', $id);
+        if ($subscription === null) {
+            throw new \InvalidArgumentException('The subscription was not found.');
+        }
+
+        return $subscription;
     }
 
     protected function today(): \DateTimeImmutable

@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 3.1 (Extend subscription)
-- **Branch**: feature-subscription-ledger-create-read-edit
+- **Task**: 3.2 (Inline expiry edit)
+- **Branch**: feature-subscription-ledger-lifecycle
 - **Started**: 2026-08-28
-- **Status**: Implementing Phase 2 create, list, and edit endpoints
+- **Status**: Implementing Phase 3 subscription lifecycle endpoints
 
 ### Notes
 
@@ -27,12 +27,12 @@
   Cockpit subscription with a month-clamped expiry and recipient share link.
 - Task 2.3 is complete: active key-name changes sync to Outline before
   Cockpit updates; disabled subscriptions update Cockpit only.
-- Docker verification passed: focused date-helper tests (4/4) and full suite
-  (72/72).
+- Task 3.1 is complete: extending starts from the later of today or the
+  current expiry and uses month-end-safe date math.
+- Docker verification passed: focused Phase 3 tests (17/17).
 
 ## Up Next
 
-- 3.1: Extend subscription
 - 3.2: Inline expiry edit
 - 3.3: Enable and disable
 
