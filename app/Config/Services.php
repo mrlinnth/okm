@@ -93,4 +93,19 @@ class Services extends BaseService
 
         return new \App\Libraries\SavedServersService();
     }
+
+    /**
+     * Subscription Ledger Service
+     *
+     * @param bool $getShared
+     * @return \App\Libraries\SubscriptionsService
+     */
+    public static function subscriptions(bool $getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('subscriptions');
+        }
+
+        return new \App\Libraries\SubscriptionsService();
+    }
 }

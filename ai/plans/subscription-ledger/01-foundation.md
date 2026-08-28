@@ -55,7 +55,7 @@ generations, no duplicates).
 
 ---
 
-### Task [1.3]: Controller skeleton and routes
+### Task [1.3]: Controller skeleton and routes [DONE]
 
 #### Subtasks
 
