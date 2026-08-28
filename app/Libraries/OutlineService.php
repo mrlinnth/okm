@@ -219,7 +219,7 @@ class OutlineService
             }
         }
 
-        throw new OutlineRequestException("No key named \"{$name}\" was found.");
+        throw new OutlineRequestException("No key named \"{$name}\" was found.", notFound: true);
     }
 
     /**

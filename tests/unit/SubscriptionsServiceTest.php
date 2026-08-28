@@ -59,6 +59,99 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         ];
     }
 
+    /**
+     * @dataProvider expirableCases
+     */
+    public function testFindExpirableSelectsOnlyActiveRecordsPastTheGracePeriod(array $subscription, bool $expected): void
+    {
+        $cockpit = new class($subscription) extends CockpitService {
+            public function __construct(private array $subscription) {}
+            public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
+            {
+                return [$this->subscription];
+            }
+        };
+        $service = new class($cockpit) extends SubscriptionsService {
+            public function __construct(CockpitService $cockpit) { parent::__construct($cockpit); }
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable('2026-08-28'); }
+        };
+
+        $ids = array_column($service->findExpirable(), '_id');
+
+        $this->assertSame($expected ? ['sub-1'] : [], $ids);
+    }
+
+    /**
+     * Grace period defaults to 3 days; today is 2026-08-28, so the boundary
+     * expiry date is 2026-08-25.
+     *
+     * @return array<string, array{0: array<string, string>, 1: bool}>
+     */
+    public static function expirableCases(): array
+    {
+        return [
+            'on the grace boundary' => [['_id' => 'sub-1', 'status' => 'active', 'expiryDate' => '2026-08-25'], false],
+            'one day past the boundary' => [['_id' => 'sub-1', 'status' => 'active', 'expiryDate' => '2026-08-24'], true],
+            'within the grace period' => [['_id' => 'sub-1', 'status' => 'active', 'expiryDate' => '2026-08-27'], false],
+            'disabled and overdue' => [['_id' => 'sub-1', 'status' => 'disabled', 'expiryDate' => '2026-01-01'], false],
+            'already expired' => [['_id' => 'sub-1', 'status' => 'expired', 'expiryDate' => '2026-01-01'], false],
+            'no expiry date' => [['_id' => 'sub-1', 'status' => 'active'], false],
+        ];
+    }
+
+    public function testProcessExpiryDeletesTheKeyAndMarksExpiredOnSuccess(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $update = [];
+            public function __construct() {}
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService { public array $delete = []; public function __construct() {} public function deleteKey(string $apiUrl, string $name): void { $this->delete = [$apiUrl, $name]; } };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))
+            ->processExpiry(['_id' => 'sub-1', 'serverId' => 'srv-1', 'keyName' => 'alice-key']);
+
+        $this->assertSame(['https://outline.example/api', 'alice-key'], $outline->delete);
+        $this->assertSame(['status' => 'expired'], $cockpit->update);
+        $this->assertSame(['id' => 'sub-1', 'outcome' => 'expired'], $result);
+    }
+
+    public function testProcessExpiryTreatsAnAlreadyGoneKeyAsSuccess(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $update = [];
+            public function __construct() {}
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService { public function __construct() {} public function deleteKey(string $apiUrl, string $name): void { throw new \App\Libraries\OutlineRequestException('gone', notFound: true); } };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))
+            ->processExpiry(['_id' => 'sub-1', 'serverId' => 'srv-1', 'keyName' => 'alice-key']);
+
+        $this->assertSame(['status' => 'expired'], $cockpit->update);
+        $this->assertSame(['id' => 'sub-1', 'outcome' => 'expired'], $result);
+    }
+
+    public function testProcessExpiryLeavesTheRecordUntouchedOnAGenuineFailure(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public bool $updated = false;
+            public function __construct() {}
+            public function updateItem(string $model, string $id, array $data): ?array { $this->updated = true; return $data; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService { public function __construct() {} public function deleteKey(string $apiUrl, string $name): void { throw new \App\Libraries\OutlineRequestException('Outline request failed: connection refused'); } };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))
+            ->processExpiry(['_id' => 'sub-1', 'serverId' => 'srv-1', 'keyName' => 'alice-key']);
+
+        $this->assertFalse($cockpit->updated);
+        $this->assertSame('failed', $result['outcome']);
+        $this->assertSame('Outline request failed: connection refused', $result['error']);
+    }
+
     public function testRenameSyncsActiveKeyBeforeUpdatingCockpit(): void
     {
         $cockpit = new class extends CockpitService {

@@ -51,6 +51,59 @@ class SubscriptionsService
     }
 
     /**
+     * Active subscriptions whose expiry is more than the configured grace
+     * period in the past — the records the expiry job should process.
+     *
+     * Eligible when: today > expiryDate + gracePeriodDays. A record exactly
+     * on that boundary is not yet eligible. Skips disabled records (no live
+     * key) and already-expired ones (already processed).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function findExpirable(): array
+    {
+        $graceDays = config('Expiry')->gracePeriodDays;
+        $cutoff = $this->today()->modify("-{$graceDays} days")->format('Y-m-d');
+
+        return array_values(array_filter(
+            $this->cockpit->getCollectionCached('subscriptions'),
+            static fn (array $subscription): bool => ($subscription['status'] ?? null) === 'active'
+                && (string) ($subscription['expiryDate'] ?? '') !== ''
+                && (string) $subscription['expiryDate'] < $cutoff,
+        ));
+    }
+
+    /**
+     * Delete an expired subscription's Outline key and mark it expired.
+     *
+     * A key that is already gone on the Outline server counts as success —
+     * the desired end state holds. Only a genuine transport/HTTP failure
+     * leaves the record untouched so the next run retries it.
+     *
+     * @param array<string, mixed> $subscription
+     * @return array{id: string, outcome: string, error?: string}
+     */
+    public function processExpiry(array $subscription): array
+    {
+        $id = (string) ($subscription['_id'] ?? '');
+
+        try {
+            $server = $this->findServerById((string) ($subscription['serverId'] ?? ''));
+            $this->outline->deleteKey((string) $server['apiUrl'], (string) ($subscription['keyName'] ?? ''));
+        } catch (OutlineRequestException $e) {
+            if (! $e->isNotFound()) {
+                return ['id' => $id, 'outcome' => 'failed', 'error' => $e->getMessage()];
+            }
+        } catch (\Throwable $e) {
+            return ['id' => $id, 'outcome' => 'failed', 'error' => $e->getMessage()];
+        }
+
+        $this->cockpit->updateItem('subscriptions', $id, ['status' => 'expired']);
+
+        return ['id' => $id, 'outcome' => 'expired'];
+    }
+
+    /**
      * Find a subscription using its public recipient token.
      *
      * @return array<string, mixed>|null
@@ -351,6 +404,24 @@ class SubscriptionsService
             }
 
             return $server;
+        }
+
+        throw new \InvalidArgumentException('The selected server was not found.');
+    }
+
+    /**
+     * Resolve a saved server by id regardless of its active state. The
+     * expiry job still needs to delete keys on servers that have since been
+     * deactivated.
+     *
+     * @return array<string, mixed>
+     */
+    private function findServerById(string $serverId): array
+    {
+        foreach ($this->savedServers->list() as $server) {
+            if (($server['_id'] ?? null) === $serverId) {
+                return $server;
+            }
         }
 
         throw new \InvalidArgumentException('The selected server was not found.');

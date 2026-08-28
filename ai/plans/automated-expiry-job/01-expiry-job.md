@@ -5,12 +5,12 @@ Cockpit collection), Saved servers registry (`SavedServersService`), Classic
 key manager (`app/Libraries/OutlineService.php`,
 `app/Libraries/OutlineRequestException.php`).
 
-### Task [1.1]: Grace-period config, eligibility scan, and expiry processing
+### Task [1.1]: Grace-period config, eligibility scan, and expiry processing [DONE]
 
 #### Subtasks
 
 - [ ] Create `app/Config/Expiry.php` (`BaseConfig`) with `int $gracePeriodDays
-  = 3`.
+= 3`.
 - [ ] Extend `app/Libraries/OutlineRequestException.php` (shared with
       Classic key manager / Subscription ledger) with a `notFound` flag —
       e.g. a constructor parameter `bool $notFound = false` plus an
@@ -21,14 +21,14 @@ key manager (`app/Libraries/OutlineService.php`,
       deleted" from a genuine failure without parsing error message text.
 - [ ] Add `SubscriptionsService::findExpirable(): array` — from the cached
       `subscriptions` list, filter to `status === 'active'` AND `today >
-    expiryDate + gracePeriodDays` (using `Config\Expiry::$gracePeriodDays`).
+  expiryDate + gracePeriodDays` (using `Config\Expiry::$gracePeriodDays`).
 - [ ] Add `SubscriptionsService::processExpiry(array $subscription): array`
       — resolves the subscription's server via `SavedServersService`, calls
       `OutlineService::deleteKey($apiUrl, $subscription['keyName'])`: - No exception, or `OutlineRequestException` with `isNotFound() ===
-      true` → update the Cockpit record to `status = 'expired'`, return
+    true` → update the Cockpit record to `status = 'expired'`, return
       `['id' => ..., 'outcome' => 'expired']`. - `OutlineRequestException` with `isNotFound() === false` (genuine
       failure) → leave the record untouched, return `['id' => ...,
-      'outcome' => 'failed', 'error' => <message>]`.
+    'outcome' => 'failed', 'error' => <message>]`.
 
 #### Key Files
 

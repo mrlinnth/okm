@@ -2,29 +2,30 @@
 
 ## Current
 
-- **Feature**: recipient-public-page
-- **Task**: Complete
-- **Branch**: feature-recipient-public-page
+- **Feature**: automated-expiry-job
+- **Task**: 1.2 (Spark CLI command)
+- **Branch**: feature-automated-expiry-job
 - **Started**: 2026-08-28
-- **Status**: Recipient public page feature complete
+- **Status**: Task 1.1 complete; implementing the `subscriptions:expire` command next
 
 ### Notes
 
-- Task 1.1 is complete: public recipient contact configuration, 60-second
-  Cockpit token lookup, and live active/disabled/expired/not-found resolution.
-- Focused Docker PHPUnit verification passed (32 tests, 10,051 assertions).
-- Task 1.2 is complete: the public `/s/{token}` controller and route resolve
-  recipient state server-side without admin authentication.
-- Full Docker PHPUnit verification passed (114 tests, 10,249 assertions).
-- Task 1.3 is complete: standalone Myanmar recipient page with active-key
-  copy, unavailable states, and config-driven Telegram/Viber footer.
-- Final verification passed: 118 PHPUnit tests, plus Tailwind CSS build.
-- The Docker CLI image lacks npm, so the CSS build was run with the checked-in
-  local Node toolchain after Docker PHPUnit verification.
+- Task 1.1 done: `Config\Expiry` (gracePeriodDays = 3),
+  `OutlineRequestException` now carries a `notFound` flag (`isNotFound()`),
+  `OutlineService::deleteKey()` throws `notFound: true` when the key is
+  already gone, and `SubscriptionsService::findExpirable()` /
+  `processExpiry()` scan and process eligible records.
+- `processExpiry()` resolves the server via a new `findServerById()` helper
+  (no active check — deactivated servers still hold live keys) and returns
+  `['id', 'outcome' => 'expired'|'failed', 'error'?]`. A not-found delete
+  counts as success; a genuine failure leaves the record untouched.
+- Verification: `phpunit --filter=SubscriptionsServiceTest` (41 tests) and
+  full suite (135 tests) green.
 
 ## Up Next
 
-- Automated expiry job is the next planned feature.
+- 1.2: Spark command `subscriptions:expire` (app/Commands/ExpireSubscriptions.php)
+- 1.3: `resolveRecipientState()` explicit `status === 'expired'` branch
 
 ## Blockers
 
