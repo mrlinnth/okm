@@ -32,7 +32,7 @@
                             <button @click="startOverCurrent()" class="link link-hover text-xs text-base-content/50">Start over</button>
                         </div>
 
-                        <div class="mt-3 space-y-2">
+                        <div class="mt-3 space-y-2 max-h-[28rem] overflow-y-auto pr-1">
                             <template x-for="key in current.keys" :key="key.id">
                                 <div class="flex items-center justify-between rounded-md border border-base-300 px-3 py-2">
                                     <div class="min-w-0">
