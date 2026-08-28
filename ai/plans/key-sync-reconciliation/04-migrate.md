@@ -6,7 +6,7 @@ create-before-destroy pattern from
 `ai/plans/subscription-ledger/04-reroll-move-delete.md`), Classic key
 manager (`OutlineService::createKey`, `OutlineService::resolveUniqueName`).
 
-### Task [4.1]: Bulk migrate logic
+### Task [4.1]: Bulk migrate logic [DONE]
 
 #### Subtasks
 
@@ -51,7 +51,7 @@ rejects when the destination is inactive, missing, or equal to the source.
 
 ---
 
-### Task [4.2]: Migrate endpoint
+### Task [4.2]: Migrate endpoint [DONE]
 
 #### Subtasks
 

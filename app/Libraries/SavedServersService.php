@@ -18,11 +18,23 @@ class SavedServersService
 {
     protected CockpitService $cockpit;
     protected OutlineService $outline;
+    private ?SubscriptionsService $subscriptions;
 
-    public function __construct(?CockpitService $cockpit = null, ?OutlineService $outline = null)
-    {
+    public function __construct(
+        ?CockpitService $cockpit = null,
+        ?OutlineService $outline = null,
+        ?SubscriptionsService $subscriptions = null,
+    ) {
         $this->cockpit = $cockpit ?? Services::cockpit();
         $this->outline = $outline ?? Services::outline();
+        // Resolved lazily — SubscriptionsService constructs a SavedServersService,
+        // so eager resolution here would recurse.
+        $this->subscriptions = $subscriptions;
+    }
+
+    private function subscriptions(): SubscriptionsService
+    {
+        return $this->subscriptions ??= Services::subscriptions();
     }
 
     /**
@@ -165,6 +177,30 @@ class SavedServersService
         ));
 
         return ['foundOnServer' => $foundOnServer, 'missingOnServer' => $missingOnServer];
+    }
+
+    /**
+     * Move every subscription referencing the source server (any status) to
+     * an active destination server. Delegates the per-subscription
+     * create-before-destroy work to SubscriptionsService; this method owns
+     * the server-level validation.
+     *
+     * @return array{results: array<int, array<string, mixed>>, moved: int, failed: int}
+     */
+    public function migrate(string $sourceId, string $destinationId): array
+    {
+        if ($destinationId === $sourceId) {
+            throw new \InvalidArgumentException('The destination server must differ from the source.');
+        }
+
+        $this->findServer($sourceId);
+        $destination = $this->findServer($destinationId);
+
+        if (($destination['active'] ?? false) !== true) {
+            throw new \InvalidArgumentException('The destination server is inactive.');
+        }
+
+        return $this->subscriptions()->migrateAllToServer($sourceId, $destination);
     }
 
     /**

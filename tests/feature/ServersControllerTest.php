@@ -40,6 +40,8 @@ final class FakeSavedServers extends SavedServersService
     /** @var array{results: array<int, mixed>, moved: int, failed: int} */
     public array $migrateResult = ['results' => [], 'moved' => 0, 'failed' => 0];
 
+    public ?\Throwable $migrateThrows = null;
+
     public function __construct()
     {
     }
@@ -61,6 +63,10 @@ final class FakeSavedServers extends SavedServersService
     public function migrate(string $sourceId, string $destinationId): array
     {
         $this->migrateArgs[] = [$sourceId, $destinationId];
+
+        if ($this->migrateThrows !== null) {
+            throw $this->migrateThrows;
+        }
 
         return $this->migrateResult;
     }
@@ -394,6 +400,50 @@ final class ServersControllerTest extends CIUnitTestCase
 
         $result->assertStatus(422);
         $this->assertSame([], $this->subscriptions->removeRecordArgs);
+    }
+
+    // --- Phase 4: migrate ----------------------------------------
+
+    public function testMigrateDelegatesAndReturnsPerSubscriptionResults(): void
+    {
+        $this->servers->migrateResult = [
+            'results' => [
+                ['id' => 'sub-1', 'recipientName' => 'Alice', 'status' => 'success', 'renamed_from' => 'alice'],
+                ['id' => 'sub-2', 'recipientName' => 'Bob', 'status' => 'failed', 'error' => 'boom'],
+            ],
+            'moved'  => 1,
+            'failed' => 1,
+        ];
+
+        $result = $this->withBodyFormat('json')->post('/servers/src/migrate', [
+            'destinationServerId' => 'dst',
+        ]);
+
+        $result->assertStatus(200);
+        $this->assertSame(['src', 'dst'], $this->servers->migrateArgs[0]);
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame('alice', $decoded['results'][0]['renamed_from']);
+        $this->assertSame(1, $decoded['failed']);
+    }
+
+    public function testMigrateRejectsAMissingDestination(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/servers/src/migrate', []);
+
+        $result->assertStatus(422);
+        $this->assertSame([], $this->servers->migrateArgs);
+    }
+
+    public function testMigrateSurfacesValidationErrorsAs422(): void
+    {
+        $this->servers->migrateThrows = new \InvalidArgumentException('The destination server is inactive.');
+
+        $result = $this->withBodyFormat('json')->post('/servers/src/migrate', [
+            'destinationServerId' => 'dst',
+        ]);
+
+        $result->assertStatus(422);
+        $result->assertJSONFragment(['error' => 'The destination server is inactive.']);
     }
 
     // --- Task 2.4: delete ------------------------------------------

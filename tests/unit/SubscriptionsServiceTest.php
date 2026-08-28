@@ -216,6 +216,94 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         $this->assertCount(5, $results);
     }
 
+    public function testMigrateAllToServerSuffixesCollisionsRepointsInactiveAndCleansUp(): void
+    {
+        $cockpit = new class extends CockpitService {
+            /** @var array<string, array<string, mixed>> */
+            public array $updates = [];
+            public function __construct() {}
+            public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
+            {
+                return [
+                    ['_id' => 'sub-active', 'status' => 'active', 'serverId' => 'source', 'keyName' => 'dupe', 'outlineKeyId' => 'old-1', 'recipientName' => 'Alice'],
+                    ['_id' => 'sub-disabled', 'status' => 'disabled', 'serverId' => 'source', 'keyName' => 'x', 'outlineKeyId' => 'old-2', 'recipientName' => 'Bob'],
+                ];
+            }
+            public function updateItem(string $model, string $id, array $data): ?array
+            {
+                $this->updates[$id] = $data;
+
+                return array_merge(['_id' => $id], $data);
+            }
+        };
+        $servers = new class extends SavedServersService {
+            public function __construct() {}
+            public function list(): array
+            {
+                return [
+                    ['_id' => 'source', 'apiUrl' => 'https://source/api', 'active' => true],
+                    ['_id' => 'dest', 'apiUrl' => 'https://dest/api', 'active' => true],
+                ];
+            }
+        };
+        $outline = new class extends OutlineService {
+            /** @var array<int, array{0: string, 1: string}> */
+            public array $deleted = [];
+            public function __construct() {}
+            public function listKeys(string $apiUrl): array { return [['id' => 'k', 'name' => 'dupe', 'accessUrl' => 'ss://k']]; }
+            public function createKey(string $apiUrl, string $name): array { return ['id' => 'new-' . $name, 'accessUrl' => 'ss://' . $name, 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; }
+            public function deleteKeyById(string $apiUrl, string $id): void { $this->deleted[] = [$apiUrl, $id]; }
+        };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))
+            ->migrateAllToServer('source', ['_id' => 'dest', 'apiUrl' => 'https://dest/api', 'active' => true]);
+
+        $this->assertSame('dupe_2', $cockpit->updates['sub-active']['keyName']);
+        $this->assertSame('dest', $cockpit->updates['sub-active']['serverId']);
+        $this->assertSame('new-dupe_2', $cockpit->updates['sub-active']['outlineKeyId']);
+        $this->assertSame([['https://source/api', 'old-1']], $outline->deleted);
+        $this->assertSame(['serverId' => 'dest'], $cockpit->updates['sub-disabled']);
+        $this->assertSame('dupe', $result['results'][0]['renamed_from']);
+        $this->assertArrayNotHasKey('warning', $result['results'][0]);
+        $this->assertSame(2, $result['moved']);
+        $this->assertSame(0, $result['failed']);
+    }
+
+    public function testMigrateAllToServerKeepsTheNewKeyWhenSourceCleanupFails(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
+            {
+                return [['_id' => 'sub-active', 'status' => 'active', 'serverId' => 'source', 'keyName' => 'alice', 'outlineKeyId' => 'old-1', 'recipientName' => 'Alice']];
+            }
+            public function updateItem(string $model, string $id, array $data): ?array { return array_merge(['_id' => $id], $data); }
+        };
+        $servers = new class extends SavedServersService {
+            public function __construct() {}
+            public function list(): array
+            {
+                return [
+                    ['_id' => 'source', 'apiUrl' => 'https://source/api', 'active' => true],
+                    ['_id' => 'dest', 'apiUrl' => 'https://dest/api', 'active' => true],
+                ];
+            }
+        };
+        $outline = new class extends OutlineService {
+            public function __construct() {}
+            public function listKeys(string $apiUrl): array { return []; }
+            public function createKey(string $apiUrl, string $name): array { return ['id' => 'new-key', 'accessUrl' => 'ss://new', 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; }
+            public function deleteKeyById(string $apiUrl, string $id): void { throw new \RuntimeException('source unreachable'); }
+        };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))
+            ->migrateAllToServer('source', ['_id' => 'dest', 'apiUrl' => 'https://dest/api', 'active' => true]);
+
+        $this->assertSame('success', $result['results'][0]['status']);
+        $this->assertSame('The old Outline key could not be deleted: source unreachable', $result['results'][0]['warning']);
+        $this->assertSame(1, $result['moved']);
+    }
+
     public function testRemoveRecordDeletesOnlyTheCockpitRecord(): void
     {
         $cockpit = new class extends CockpitService {

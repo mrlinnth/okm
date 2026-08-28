@@ -6,6 +6,7 @@ use App\Libraries\OutlineRequestException;
 use App\Libraries\OutlineService;
 use App\Libraries\SavedServersService;
 use App\Libraries\ServerUnreachableException;
+use App\Libraries\SubscriptionsService;
 use CodeIgniter\Test\CIUnitTestCase;
 
 /**
@@ -275,5 +276,57 @@ final class SavedServersServiceTest extends CIUnitTestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->diffServer('missing');
+    }
+
+    public function testMigrateResolvesTheDestinationAndDelegatesToSubscriptions(): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'source', 'apiUrl' => 'https://source/api', 'active' => true],
+            ['_id' => 'dest', 'apiUrl' => 'https://dest/api', 'active' => true],
+        ];
+        $subscriptions = new class extends SubscriptionsService {
+            /** @var array{0: string, 1: array<string, mixed>} */
+            public array $args = [];
+            public function __construct() {}
+            public function migrateAllToServer(string $sourceId, array $destinationServer): array
+            {
+                $this->args = [$sourceId, $destinationServer];
+
+                return ['results' => [], 'moved' => 0, 'failed' => 0];
+            }
+        };
+        $service = new SavedServersService($this->cockpit, $this->outline, $subscriptions);
+
+        $service->migrate('source', 'dest');
+
+        $this->assertSame('source', $subscriptions->args[0]);
+        $this->assertSame('dest', $subscriptions->args[1]['_id']);
+    }
+
+    /**
+     * @dataProvider invalidMigrateDestinations
+     */
+    public function testMigrateRejectsInvalidDestinations(string $destination, string $message): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'source', 'apiUrl' => 'https://source/api', 'active' => true],
+            ['_id' => 'inactive', 'apiUrl' => 'https://inactive/api', 'active' => false],
+        ];
+        $subscriptions = new class extends SubscriptionsService { public function __construct() {} };
+        $service = new SavedServersService($this->cockpit, $this->outline, $subscriptions);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+        $service->migrate('source', $destination);
+    }
+
+    /** @return array<string, array{0: string, 1: string}> */
+    public static function invalidMigrateDestinations(): array
+    {
+        return [
+            'same as source'       => ['source', 'The destination server must differ from the source.'],
+            'inactive destination' => ['inactive', 'The destination server is inactive.'],
+            'missing destination'  => ['missing', 'The selected server was not found.'],
+        ];
     }
 }

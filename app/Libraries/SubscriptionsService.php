@@ -151,6 +151,93 @@ class SubscriptionsService
     }
 
     /**
+     * Move every subscription referencing $sourceId to $destinationServer.
+     * Sequential, continuing past per-item failures. Active subscriptions
+     * get a fresh key on the destination (collision-suffixed, tracked
+     * within the batch) before a best-effort delete of the old key — a
+     * cleanup failure is a warning, never an item failure. Inactive
+     * subscriptions are just repointed.
+     *
+     * @param array<string, mixed> $destinationServer  the resolved destination `servers` record
+     * @return array{results: array<int, array<string, mixed>>, moved: int, failed: int}
+     */
+    public function migrateAllToServer(string $sourceId, array $destinationServer): array
+    {
+        $sourceServer  = $this->findServerById($sourceId);
+        $sourceApiUrl  = (string) $sourceServer['apiUrl'];
+        $destApiUrl    = (string) $destinationServer['apiUrl'];
+        $destinationId = (string) $destinationServer['_id'];
+
+        $existingNames   = array_column($this->outline->listKeys($destApiUrl), 'name');
+        $reservedInBatch = [];
+
+        $subscriptions = $this->cockpit->getCollectionCached('subscriptions', [
+            'filter' => ['serverId' => $sourceId],
+        ], 60);
+
+        $results = [];
+        $moved   = 0;
+        $failed  = 0;
+
+        foreach ($subscriptions as $subscription) {
+            $id            = (string) ($subscription['_id'] ?? '');
+            $recipientName = (string) ($subscription['recipientName'] ?? '');
+
+            try {
+                if (($subscription['status'] ?? null) === 'active') {
+                    $requestedName = (string) ($subscription['keyName'] ?? '');
+                    $uniqueName    = $this->outline->resolveUniqueName($requestedName, $existingNames, $reservedInBatch);
+                    $reservedInBatch[] = $uniqueName;
+
+                    $newKey = $this->outline->createKey($destApiUrl, $uniqueName);
+
+                    $changes = [
+                        'serverId'     => $destinationId,
+                        'outlineKeyId' => $newKey['id'],
+                        'accessUrl'    => $newKey['accessUrl'],
+                    ];
+                    if ($uniqueName !== $requestedName) {
+                        $changes['keyName'] = $uniqueName;
+                    }
+
+                    if ($this->cockpit->updateItem('subscriptions', $id, $changes) === null) {
+                        throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+                    }
+
+                    $result = ['id' => $id, 'recipientName' => $recipientName, 'status' => 'success'];
+                    if ($uniqueName !== $requestedName) {
+                        $result['renamed_from'] = $requestedName;
+                    }
+
+                    try {
+                        $this->outline->deleteKeyById($sourceApiUrl, (string) $subscription['outlineKeyId']);
+                    } catch (\Throwable $e) {
+                        $result['warning'] = 'The old Outline key could not be deleted: ' . $e->getMessage();
+                    }
+
+                    $results[] = $result;
+                    $moved++;
+
+                    continue;
+                }
+
+                // Disabled / expired — no live key, just repoint.
+                if ($this->cockpit->updateItem('subscriptions', $id, ['serverId' => $destinationId]) === null) {
+                    throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+                }
+
+                $results[] = ['id' => $id, 'recipientName' => $recipientName, 'status' => 'success'];
+                $moved++;
+            } catch (\Throwable $e) {
+                $results[] = ['id' => $id, 'recipientName' => $recipientName, 'status' => 'failed', 'error' => $e->getMessage()];
+                $failed++;
+            }
+        }
+
+        return ['results' => $results, 'moved' => $moved, 'failed' => $failed];
+    }
+
+    /**
      * Delete a subscription's Cockpit record only — no Outline call. Used
      * to resolve a "missing on server" diff row, where the key is already
      * confirmed absent.

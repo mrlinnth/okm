@@ -164,6 +164,27 @@ class Servers extends WebController
         return $this->response->setJSON(['success' => Services::subscriptions()->removeRecord($subscriptionId)]);
     }
 
+    /**
+     * Bulk-move every subscription off this server onto another active
+     * server. One-shot — the admin re-runs it if items fail.
+     */
+    public function migrate(string $id): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+        $destinationServerId = $this->requireString($body, 'destinationServerId');
+        if ($destinationServerId === null) {
+            return $this->errorResponse(422, 'destinationServerId is required.');
+        }
+
+        try {
+            $result = Services::savedServers()->migrate($id, $destinationServerId);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        }
+
+        return $this->response->setJSON($result);
+    }
+
     public function delete(string $id): ResponseInterface
     {
         $subscriptionCount = Services::subscriptions()->countByServer($id);
