@@ -38,6 +38,20 @@
 - Manual smoke test of the Saved Servers UI (sync/migrate/import panels).
 - No further planned features after this one.
 
+### UI fixes (commit 0837cc4)
+
+- Stylesheet was served `immutable`/1-year with no cache-buster, so CSS
+  changes never reached returning visitors → added `?v={filemtime}` to
+  every `<link href="/css/output.css">`.
+- Every modal was `class="modal modal-open"` (hidden only via Alpine
+  `x-show`), so daisyUI 5's `:root:has(.modal-open){overflow:hidden}`
+  locked page scroll permanently → switched to
+  `class="modal" :class="{ 'modal-open': state }"` across classic /
+  subscriptions / servers views.
+- Removed dead daisyUI-v4 classes (`input-bordered`, `select-bordered`,
+  `textarea-bordered`, `label-text`); servers Add/Migrate fields now use
+  the v5 `fieldset` / `fieldset-legend` idiom.
+
 ## Blockers
 
 - None.
