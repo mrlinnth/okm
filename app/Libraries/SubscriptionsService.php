@@ -12,10 +12,17 @@ use Config\Services;
 class SubscriptionsService
 {
     protected CockpitService $cockpit;
+    protected SavedServersService $savedServers;
+    protected OutlineService $outline;
 
-    public function __construct(?CockpitService $cockpit = null)
-    {
+    public function __construct(
+        ?CockpitService $cockpit = null,
+        ?SavedServersService $savedServers = null,
+        ?OutlineService $outline = null,
+    ) {
         $this->cockpit = $cockpit ?? Services::cockpit();
+        $this->savedServers = $savedServers ?? Services::savedServers();
+        $this->outline = $outline ?? Services::outline();
     }
 
     /**
@@ -41,6 +48,69 @@ class SubscriptionsService
         );
 
         return $subscriptions;
+    }
+
+    /**
+     * Create an active Outline key and its matching Cockpit subscription.
+     *
+     * @return array<string, mixed>
+     */
+    public function create(
+        string $recipientName,
+        string $keyName,
+        string $serverId,
+        int $durationMonths,
+        ?string $notes,
+    ): array {
+        $server = $this->findActiveServer($serverId);
+        $key = $this->outline->createKey((string) $server['apiUrl'], $keyName);
+        $token = self::generateToken();
+        $expiryDate = self::addMonthsClamped($this->today(), $durationMonths)->format('Y-m-d');
+
+        $subscription = $this->cockpit->createItem('subscriptions', [
+            'recipientName' => $recipientName,
+            'keyName'       => $keyName,
+            'notes'         => $notes ?? '',
+            'serverId'      => $serverId,
+            'outlineKeyId'  => $key['id'],
+            'accessUrl'     => $key['accessUrl'],
+            'status'        => 'active',
+            'expiryDate'    => $expiryDate,
+            'token'         => $token,
+        ]);
+
+        if ($subscription === null) {
+            throw new \RuntimeException('Failed to save the subscription to Cockpit.');
+        }
+
+        $subscription['shareLink'] = base_url('/s/' . $token);
+
+        return $subscription;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function findActiveServer(string $serverId): array
+    {
+        foreach ($this->savedServers->list() as $server) {
+            if (($server['_id'] ?? null) !== $serverId) {
+                continue;
+            }
+
+            if (($server['active'] ?? false) !== true) {
+                throw new \InvalidArgumentException('The selected server is inactive.');
+            }
+
+            return $server;
+        }
+
+        throw new \InvalidArgumentException('The selected server was not found.');
+    }
+
+    protected function today(): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable('today');
     }
 
     /**

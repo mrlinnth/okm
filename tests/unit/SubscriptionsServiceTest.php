@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Libraries\SubscriptionsService;
 use App\Libraries\CockpitService;
+use App\Libraries\OutlineService;
+use App\Libraries\SavedServersService;
 use CodeIgniter\Test\CIUnitTestCase;
 
 /**
@@ -11,6 +13,44 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class SubscriptionsServiceTest extends CIUnitTestCase
 {
+    public function testCreatePersistsActiveSubscriptionAndShareLink(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $createArgs = [];
+            public function __construct() {}
+            public function createItem(string $model, array $data): ?array
+            {
+                $this->createArgs = [$model, $data];
+                return array_merge(['_id' => 'sub-1'], $data);
+            }
+        };
+        $servers = new class extends SavedServersService {
+            public function __construct() {}
+            public function list(): array
+            {
+                return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]];
+            }
+        };
+        $outline = new class extends OutlineService {
+            public function __construct() {}
+            public function createKey(string $apiUrl, string $name): array
+            {
+                return ['id' => 'key-1', 'name' => $name, 'accessUrl' => 'ss://key-1', 'bytesUsed' => 0, 'usage' => '0 B'];
+            }
+        };
+        $service = new class($cockpit, $servers, $outline) extends SubscriptionsService {
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable('2025-01-31'); }
+        };
+
+        $created = $service->create('Alice', 'alice-key', 'srv-1', 1, null);
+
+        $this->assertSame('subscriptions', $cockpit->createArgs[0]);
+        $this->assertSame('2025-02-28', $cockpit->createArgs[1]['expiryDate']);
+        $this->assertSame('active', $cockpit->createArgs[1]['status']);
+        $this->assertSame('key-1', $cockpit->createArgs[1]['outlineKeyId']);
+        $this->assertMatchesRegularExpression('#/s/[a-f0-9]{32}$#', $created['shareLink']);
+    }
+
     public function testListUsesCockpitCollectionAndSortsByExpiryDate(): void
     {
         $cockpit = new class extends CockpitService {

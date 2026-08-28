@@ -25,7 +25,7 @@ by expiry and the active-servers list present in the response data.
 
 ---
 
-### Task [2.2]: Create subscription
+### Task [2.2]: Create subscription [DONE]
 
 #### Subtasks
 
