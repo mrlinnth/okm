@@ -4,7 +4,7 @@ Depends on: Classic key manager Phase 1 (`app/Libraries/OutlineService.php`,
 `ai/plans/classic-key-manager/01-outline-client.md`) — reused for the
 reachability check on Add Server.
 
-### Task [1.1]: Extend CockpitService with write methods
+### Task [1.1]: Extend CockpitService with write methods [DONE]
 
 #### Subtasks
 
@@ -15,7 +15,7 @@ reachability check on Add Server.
       POSTs to Cockpit's Content API create endpoint for the model — verify
       the exact path/payload shape against Cockpit v2's Content API docs
       (likely `POST {apiUrl}/api/content/item/{model}` with a `{data:
-    {...}}` body, mirroring the existing GET singleton path convention at
+  {...}}` body, mirroring the existing GET singleton path convention at
       `getSingleton()` — confirm against the live instance during
       implementation, don't assume without checking).
 - [ ] Add `updateItem(string $model, string $id, array $data): ?array` —
@@ -25,7 +25,7 @@ reachability check on Add Server.
 - [ ] Each write method must invalidate the relevant cache after a
       successful write: call the existing `clearCollectionCache($model)`
       (for list caches) and, for update/delete, `clearItemCache($model,
-    $id)` — reuse these methods as-is, do not duplicate cache-key logic.
+  $id)` — reuse these methods as-is, do not duplicate cache-key logic.
 - [ ] Keep these methods generic (model name is always a parameter) — do
       not hardcode `servers` anywhere in `CockpitService`, per
       `requirements.md`'s acceptance criteria that future features reuse
@@ -57,9 +57,9 @@ after a successful write.
       `OutlineService` (inject via `Services::outline()`, added in
       Classic key manager Phase 1) for the light reachability check; does
       not duplicate any SSRF-safety logic. - `create(string $label, string $serverJson, ?string $publicHost):
-      array` — validates via `parseServerJson`, checks reachability via
+    array` — validates via `parseServerJson`, checks reachability via
       `checkReachable`, then calls `Services::cockpit()->createItem
-      ('servers', [...])` with `label`, `serverJson`, the derived
+    ('servers', [...])` with `label`, `serverJson`, the derived
       `apiUrl`, `publicHost`, and `active = true`. Returns the created
       item or throws on validation/reachability failure — do not create
       the Cockpit item if either check fails. - `setActive(string $id, bool $active): array` — calls
@@ -90,7 +90,7 @@ the reachability check fails.
 - [ ] Create `app/Controllers/Servers.php` extending `WebController` (per
       `CLAUDE.md`), following the thin-controller pattern already used in
       `app/Controllers/Products.php` and (once built) `app/Controllers/
-    Classic.php`.
+  Classic.php`.
 - [ ] Add `index(): string` rendering a new `servers.index` Blade view
       (placeholder for now, built out in Phase 3) using
       `SavedServersService::list()`.
@@ -99,9 +99,9 @@ the reachability check fails.
       `$this->response->setJSON([...])`.
 - [ ] Register routes in `app/Config/Routes.php`: `GET /servers` →
       `Servers::index`; `POST /servers` → `Servers::store`; `POST
-    /servers/(:segment)/activate` → `Servers::activate/$1`; `POST
-    /servers/(:segment)/deactivate` → `Servers::deactivate/$1`; `POST
-    /servers/(:segment)/delete` → `Servers::delete/$1`.
+  /servers/(:segment)/activate` → `Servers::activate/$1`; `POST
+  /servers/(:segment)/deactivate` → `Servers::deactivate/$1`; `POST
+  /servers/(:segment)/delete` → `Servers::delete/$1`.
 
 #### Key Files
 

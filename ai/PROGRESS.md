@@ -2,42 +2,55 @@
 
 ## Current
 
-- **Feature**: classic-key-manager — all 14 tasks complete
-- **Branch**: feature-classic-key-manager
-- **Status**: Implementation done. Needs manual verification against a real
-  Outline server before merge (see Notes).
+- **Feature**: saved-servers-registry
+- **Task**: 1.2 (SavedServersService)
+- **Branch**: feature-saved-servers-cockpit-write
+- **Started**: 2026-08-28
+- **Status**: Task 1.1 done. Next: build SavedServersService.
 
 ### Notes
 
-- All 4 plan files, 14/14 tasks `[DONE]`. Backend: 37/37 phpunit tests
-  passing. Frontend: `app/Views/classic/index.blade.php` implements the full
-  two-panel workspace from `ai/prototype/index.html`'s Classic Manager
-  screen, restyled with daisyUI (card/btn/modal/textarea) instead of the
-  prototype's raw Tailwind, wired to the real `/classic/keys/*` endpoints
-  via `fetch()` (no mocked data).
-- No real/mock Outline server is available in this environment, and the
-  Chrome browser tool was disconnected throughout, so Phase 4's own
-  "paste real server JSON in a browser" verification steps were not run
-  live. Instead: (a) `GET /classic` verified 200 via `curl` and the feature
-  test suite, (b) the Alpine `classicManager()` factory extracted and run
-  under Node with a stubbed `fetch` exercising the full golden path —
-  connect, create, delete, delete-all (partial failure), migrate (induced
-  failure + name collision), and retry-merge (confirms retry replaces only
-  the previously-failed entries, matching by `renamed_from ?? name`, leaving
-  prior successes untouched). All assertions passed.
-- **User should verify against a real Outline server before merging**:
-  connect both panels, create/copy/delete a key, delete-all with multiple
-  keys, migrate with an intentional name collision, retry a failed migrate.
-- Dev environment: `docker-compose.yml` + `Dockerfile` (serversideup/php 8.5,
-  intl + pcov). `docker compose exec cli vendor/bin/phpunit` for tests,
-  `docker compose up -d web` + `http://localhost:8080/classic` to try it live.
-  Local `.env` needs `CI_ENVIRONMENT = development` (not committed).
+- **classic-key-manager**: 14/14 tasks `[DONE]`, merged to `develop`. Still
+  wants a live sign-off against a real Outline server, but not blocking.
+- **Task 1.1 (Cockpit write layer)** — added `createItem`/`updateItem`/
+  `deleteItem` + a `sendWrite()` transport seam to
+  `app/Libraries/CockpitService.php`. Generic (model is always a param).
+  Each write invalidates `clearCollectionCache` (+ `clearItemCache` for
+  update/delete) on 2xx. Covered by `tests/unit/CockpitServiceTest.php`
+  (7 tests) via a `TestableCockpitService` subclass that stubs `sendWrite`.
+  Full suite: 44/44 green.
+- **UNVERIFIED against live Cockpit** — `.env` has placeholder Cockpit
+  creds, and the `servers` collection does not exist on `cms.hiyan.xyz`
+  yet. Assumed Cockpit v2 Content API shapes:
+  - create/update: `POST /api/content/item/{model}` body `{data: {...}}`,
+    update carries `_id` in `data`.
+  - delete: `DELETE /api/content/item/{model}/{id}`.
+    Confirm these against the live instance before Phase 3's end-to-end pass;
+    if they differ, only `createItem`/`updateItem`/`deleteItem` URLs/bodies
+    need adjusting (tests assert on those exact shapes).
+- **Prereq for later tasks**: create the Cockpit `servers` collection
+  manually (schema in `ai/plans/saved-servers-registry/requirements.md`).
+
+### CSS build caveat (not part of this feature)
+
+- A `npm run watch:css` is running in another terminal. Tailwind v4 ignores
+  the legacy `tailwind.config.js` `content` globs and auto-scans the whole
+  repo (including `ai/prototype/index.html` and `ai/plans/**/*.md`), so
+  `public/css/output.css` churns with stray classes. The one-shot builds
+  committed on `develop` (commits 7b19eab/ae7d5c1/364077f) may differ from
+  the watcher's output. Worth scoping scanning via `@source` in
+  `public/css/input.css` — separate chore, not tracked here.
 
 ## Up Next
 
-- User manual verification against a real Outline server (see Notes)
-- Then: PR, local merge to develop, or leave as-is (task-runner default)
+- 1.2: SavedServersService (parse/validate JSON, reachability via
+  OutlineService, create/setActive/delete/list; register `savedServers()`
+  in `app/Config/Services.php`)
+- 1.3: `Servers` controller skeleton + `/servers/*` routes + placeholder view
+- Phase 2: CRUD endpoints (2.1–2.4)
+- Phase 3: Frontend UI (3.1–3.3)
 
 ## Blockers
 
-- None — feature implementation complete, pending manual sign-off
+- None. Live-Cockpit confirmation of write endpoint shapes is deferred to
+  Phase 3, not blocking Phase 1/2 (unit-tested against stubs).

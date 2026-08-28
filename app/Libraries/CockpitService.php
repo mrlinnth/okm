@@ -274,6 +274,119 @@ class CockpitService
     }
 
     /**
+     * Create a new item in a collection
+     * API Endpoint: POST /content/item/{model}  body: {data: {...}}
+     *
+     * Generic write — the model name is always a parameter, never hardcoded,
+     * so other features can reuse this for their own collections.
+     *
+     * @param string $model Name of the collection model
+     * @param array $data Field values for the new item
+     * @return array|null The created item, or null on failure
+     */
+    public function createItem(string $model, array $data): ?array
+    {
+        try {
+            $url = "{$this->apiUrl}/api/content/item/$model";
+            $result = $this->sendWrite('POST', $url, ['data' => $data]);
+
+            if ($result['status'] >= 200 && $result['status'] < 300) {
+                $this->clearCollectionCache($model);
+                return json_decode($result['body'], true);
+            }
+
+            log_message('error', "Cockpit API error creating item in '{$model}': " . $result['status']);
+            return null;
+        } catch (\Exception $e) {
+            log_message('error', "Cockpit API exception creating item in '{$model}': " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Update an existing item in a collection by ID
+     * API Endpoint: POST /content/item/{model}  body: {data: {_id, ...}}
+     *
+     * @param string $model Name of the collection model
+     * @param string $id Item ID
+     * @param array $data Field values to change (merged with the item's _id)
+     * @return array|null The updated item, or null on failure
+     */
+    public function updateItem(string $model, string $id, array $data): ?array
+    {
+        try {
+            $url = "{$this->apiUrl}/api/content/item/$model";
+            $result = $this->sendWrite('POST', $url, ['data' => array_merge($data, ['_id' => $id])]);
+
+            if ($result['status'] >= 200 && $result['status'] < 300) {
+                $this->clearCollectionCache($model);
+                $this->clearItemCache($model, $id);
+                return json_decode($result['body'], true);
+            }
+
+            log_message('error', "Cockpit API error updating item '{$model}/{$id}': " . $result['status']);
+            return null;
+        } catch (\Exception $e) {
+            log_message('error', "Cockpit API exception updating item '{$model}/{$id}': " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Delete an item from a collection by ID
+     * API Endpoint: DELETE /content/item/{model}/{id}
+     *
+     * @param string $model Name of the collection model
+     * @param string $id Item ID
+     * @return bool Whether the delete succeeded
+     */
+    public function deleteItem(string $model, string $id): bool
+    {
+        try {
+            $url = "{$this->apiUrl}/api/content/item/$model/$id";
+            $result = $this->sendWrite('DELETE', $url);
+
+            if ($result['status'] >= 200 && $result['status'] < 300) {
+                $this->clearCollectionCache($model);
+                $this->clearItemCache($model, $id);
+                return true;
+            }
+
+            log_message('error', "Cockpit API error deleting item '{$model}/{$id}': " . $result['status']);
+            return false;
+        } catch (\Exception $e) {
+            log_message('error', "Cockpit API exception deleting item '{$model}/{$id}': " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Perform a write request against the Cockpit Content API.
+     *
+     * Isolated so tests can stub the transport without touching the read
+     * paths (mirrors the seam pattern in TestableOutlineService).
+     *
+     * @param string $method HTTP verb (POST, DELETE)
+     * @param string $url Full endpoint URL
+     * @param array|null $body JSON body, or null to send none
+     * @return array{status: int, body: string}
+     */
+    protected function sendWrite(string $method, string $url, ?array $body = null): array
+    {
+        $options = [];
+        if ($body !== null) {
+            $options['json'] = $body;
+        }
+
+        $response = $this->client->request($method, $url, $options);
+
+        return [
+            'status' => $response->getStatusCode(),
+            'body' => (string) $response->getBody(),
+        ];
+    }
+
+    /**
      * Clear cache for a specific singleton
      *
      * @param string $model Name of the singleton model
