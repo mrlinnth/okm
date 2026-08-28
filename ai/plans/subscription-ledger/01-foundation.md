@@ -33,7 +33,7 @@ year), and a normal 31-day → 31-day case.
 
 ---
 
-### Task [1.2]: Token generation
+### Task [1.2]: Token generation [DONE]
 
 #### Subtasks
 

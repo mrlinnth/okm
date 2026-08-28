@@ -10,6 +10,20 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class SubscriptionsServiceTest extends CIUnitTestCase
 {
+    public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
+    {
+        $tokens = [];
+
+        for ($i = 0; $i < 10000; $i++) {
+            $token = SubscriptionsService::generateToken();
+
+            $this->assertMatchesRegularExpression('/^[a-f0-9]{32}$/', $token);
+            $tokens[$token] = true;
+        }
+
+        $this->assertCount(10000, $tokens);
+    }
+
     /**
      * @dataProvider addMonthsClampedCases
      */

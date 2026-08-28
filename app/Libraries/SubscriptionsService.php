@@ -10,6 +10,14 @@ namespace App\Libraries;
 class SubscriptionsService
 {
     /**
+     * Generate the immutable, URL-safe token used in recipient share links.
+     */
+    public static function generateToken(): string
+    {
+        return bin2hex(random_bytes(16));
+    }
+
+    /**
      * Add calendar months without allowing dates such as January 31 to
      * overflow into March when the target month has fewer days.
      */
