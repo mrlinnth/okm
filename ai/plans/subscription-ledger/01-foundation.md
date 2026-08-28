@@ -4,7 +4,7 @@ Depends on: Saved servers registry (`SavedServersService`,
 `app/Controllers/Servers.php`) and Classic key manager
 (`app/Libraries/OutlineService.php`) — both reused here.
 
-### Task [1.1]: Date math helper — month-end-safe extension
+### Task [1.1]: Date math helper — month-end-safe extension [DONE]
 
 #### Subtasks
 
