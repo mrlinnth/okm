@@ -18,7 +18,7 @@
         </div>
         <div class="flex-none items-center gap-2 hidden md:flex">
             <ul class="menu menu-horizontal px-1">
-                <li><a href="/classic">Classic Manager</a></li>
+                <li><a href="/servers">Saved Servers</a></li>
             </ul>
             <label class="swap swap-rotate btn btn-ghost btn-circle">
                 <input type="checkbox" id="theme-toggle" />
@@ -38,7 +38,7 @@
                     </svg>
                 </label>
                 <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-1 p-2 shadow bg-base-100 rounded-box w-52">
-                    <li><a href="/classic">Classic Manager</a></li>
+                    <li><a href="/servers">Saved Servers</a></li>
                     <li>
                         <label class="swap swap-rotate">
                             <input type="checkbox" id="theme-toggle-mobile" />
