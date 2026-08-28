@@ -55,6 +55,8 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
             'unknown token' => [null, 'not_found'],
             'disabled subscription' => [['status' => 'disabled', 'expiryDate' => '2026-12-01'], 'disabled'],
             'active past expiry' => [['status' => 'active', 'expiryDate' => '2026-08-27'], 'expired'],
+            'explicitly expired status' => [['status' => 'expired', 'expiryDate' => '2026-08-27'], 'expired'],
+            'explicitly expired with a future date' => [['status' => 'expired', 'expiryDate' => '2026-12-01'], 'expired'],
             'active current expiry' => [['status' => 'active', 'expiryDate' => '2026-08-28'], 'active'],
         ];
     }

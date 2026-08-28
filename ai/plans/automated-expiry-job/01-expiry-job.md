@@ -85,7 +85,7 @@ processing of the remaining records.
 
 ---
 
-### Task [1.3]: Recipient page — handle explicit expired status
+### Task [1.3]: Recipient page — handle explicit expired status [DONE]
 
 #### Subtasks
 

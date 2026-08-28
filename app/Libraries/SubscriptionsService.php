@@ -133,6 +133,12 @@ class SubscriptionsService
             return 'disabled';
         }
 
+        // Both an overdue-but-not-yet-processed subscription and one the
+        // expiry job has already marked `expired` must render identically.
+        if (($subscription['status'] ?? null) === 'expired') {
+            return 'expired';
+        }
+
         if (($subscription['status'] ?? null) === 'active'
             && (string) ($subscription['expiryDate'] ?? '') < $this->today()->format('Y-m-d')) {
             return 'expired';
