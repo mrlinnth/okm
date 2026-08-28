@@ -21,14 +21,14 @@ key manager (`app/Libraries/OutlineService.php`,
       deleted" from a genuine failure without parsing error message text.
 - [ ] Add `SubscriptionsService::findExpirable(): array` — from the cached
       `subscriptions` list, filter to `status === 'active'` AND `today >
-  expiryDate + gracePeriodDays` (using `Config\Expiry::$gracePeriodDays`).
+expiryDate + gracePeriodDays` (using `Config\Expiry::$gracePeriodDays`).
 - [ ] Add `SubscriptionsService::processExpiry(array $subscription): array`
       — resolves the subscription's server via `SavedServersService`, calls
       `OutlineService::deleteKey($apiUrl, $subscription['keyName'])`: - No exception, or `OutlineRequestException` with `isNotFound() ===
-    true` → update the Cockpit record to `status = 'expired'`, return
+  true` → update the Cockpit record to `status = 'expired'`, return
       `['id' => ..., 'outcome' => 'expired']`. - `OutlineRequestException` with `isNotFound() === false` (genuine
       failure) → leave the record untouched, return `['id' => ...,
-    'outcome' => 'failed', 'error' => <message>]`.
+  'outcome' => 'failed', 'error' => <message>]`.
 
 #### Key Files
 
@@ -49,7 +49,7 @@ simulated genuine failure.
 
 ---
 
-### Task [1.2]: Spark CLI command
+### Task [1.2]: Spark CLI command [DONE]
 
 #### Subtasks
 

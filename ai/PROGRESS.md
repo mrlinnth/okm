@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: automated-expiry-job
-- **Task**: 1.2 (Spark CLI command)
+- **Task**: 1.3 (Recipient page — explicit expired status)
 - **Branch**: feature-automated-expiry-job
 - **Started**: 2026-08-28
-- **Status**: Task 1.1 complete; implementing the `subscriptions:expire` command next
+- **Status**: Tasks 1.1 and 1.2 complete; 1.3 (small resolver branch) next
 
 ### Notes
 
@@ -19,12 +19,17 @@
   (no active check — deactivated servers still hold live keys) and returns
   `['id', 'outcome' => 'expired'|'failed', 'error'?]`. A not-found delete
   counts as success; a genuine failure leaves the record untouched.
-- Verification: `phpunit --filter=SubscriptionsServiceTest` (41 tests) and
-  full suite (135 tests) green.
+- Task 1.2 done: `app/Commands/ExpireSubscriptions.php` → `php spark
+subscriptions:expire`. Iterates `findExpirable()` → `processExpiry()`,
+  logs failed outcomes via `log_message('error', ...)`, continues past
+  failures, prints `Expired: N, Failed: M`. Cron note (00:05 UTC daily) in
+  the command docblock.
+- Command tests use CI4's `command()` + `StreamFilterTrait`; log assertions
+  via `TestLogger`/`assertLogged` (op_logs reset in setUp).
+- Verification: full suite 138 tests green.
 
 ## Up Next
 
-- 1.2: Spark command `subscriptions:expire` (app/Commands/ExpireSubscriptions.php)
 - 1.3: `resolveRecipientState()` explicit `status === 'expired'` branch
 
 ## Blockers
