@@ -144,6 +144,44 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         (new SubscriptionsService($cockpit))->createFromOutlineKey('srv-1', ['id' => 'k', 'name' => 'n'], new \DateTimeImmutable('2026-09-30'));
     }
 
+    public function testImportAllFromServerCreatesOnePerKeyAndContinuesPastFailures(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public int $calls = 0;
+            public function __construct() {}
+            public function createItem(string $model, array $data): ?array
+            {
+                $this->calls++;
+
+                return $data['keyName'] === 'bad' ? null : array_merge(['_id' => 'sub'], $data);
+            }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} };
+        $outline = new class extends OutlineService {
+            public array $listKeysArgs = [];
+            public function __construct() {}
+            public function listKeys(string $apiUrl): array
+            {
+                $this->listKeysArgs[] = $apiUrl;
+
+                return [
+                    ['id' => 'k1', 'name' => 'alice', 'accessUrl' => 'ss://1'],
+                    ['id' => 'k2', 'name' => 'bad', 'accessUrl' => 'ss://2'],
+                    ['id' => 'k3', 'name' => 'carol', 'accessUrl' => 'ss://3'],
+                ];
+            }
+        };
+
+        $summary = (new SubscriptionsService($cockpit, $servers, $outline))
+            ->importAllFromServer('srv-1', 'https://vpn.example/x', new \DateTimeImmutable('2026-09-30'));
+
+        $this->assertSame(['https://vpn.example/x'], $outline->listKeysArgs);
+        $this->assertSame(3, $cockpit->calls);
+        $this->assertSame(2, $summary['imported']);
+        $this->assertSame(1, $summary['failed']);
+        $this->assertSame('bad', $summary['failures'][0]['name']);
+    }
+
     public function testProcessExpiryDeletesTheKeyAndMarksExpiredOnSuccess(): void
     {
         $cockpit = new class extends CockpitService {

@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Libraries\InvalidServerJsonException;
 use App\Libraries\ServerUnreachableException;
+use App\Libraries\SubscriptionsService;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
 
@@ -55,7 +56,20 @@ class Servers extends WebController
             return $this->errorResponse(422, $e->getMessage());
         }
 
-        return $this->response->setJSON($this->presentServer($server));
+        // Auto-subscribe the server's existing Outline keys. The server
+        // record is already committed, so an import failure never fails the
+        // request — it is reported in the summary instead.
+        try {
+            $import = Services::subscriptions()->importAllFromServer(
+                (string) ($server['_id'] ?? ''),
+                (string) ($server['apiUrl'] ?? ''),
+                SubscriptionsService::addMonthsClamped(new \DateTimeImmutable('today'), 1),
+            );
+        } catch (\Throwable $e) {
+            $import = ['imported' => 0, 'failed' => 0, 'failures' => [['name' => '', 'error' => $e->getMessage()]]];
+        }
+
+        return $this->response->setJSON($this->presentServer($server) + ['import' => $import]);
     }
 
     /**

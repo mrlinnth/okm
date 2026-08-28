@@ -84,9 +84,26 @@ final class FakeSubscriptionsForServers extends SubscriptionsService
 {
     public int $count = 0;
 
+    /** @var array<int, array{0: string, 1: string, 2: string}> */
+    public array $importArgs = [];
+
+    /** @var array{imported: int, failed: int, failures: array<int, array{name: string, error: string}>} */
+    public array $importSummary = ['imported' => 0, 'failed' => 0, 'failures' => []];
+
+    public function __construct()
+    {
+    }
+
     public function countByServer(string $serverId): int
     {
         return $this->count;
+    }
+
+    public function importAllFromServer(string $serverId, string $apiUrl, \DateTimeImmutable $expiryDate): array
+    {
+        $this->importArgs[] = [$serverId, $apiUrl, $expiryDate->format('Y-m-d')];
+
+        return $this->importSummary;
     }
 }
 
@@ -163,6 +180,30 @@ final class ServersControllerTest extends CIUnitTestCase
         $this->assertSame('new-id', $decoded['id']);
         $this->assertSame('HK-1', $decoded['label']);
         $this->assertArrayNotHasKey('serverJson', $decoded);
+    }
+
+    public function testStoreImportsExistingKeysAndReturnsTheSummary(): void
+    {
+        $this->subscriptions->importSummary = [
+            'imported' => 3,
+            'failed'   => 1,
+            'failures' => [['name' => 'bad-key', 'error' => 'Cockpit write failed.']],
+        ];
+
+        $result = $this->withBodyFormat('json')->post('/servers', [
+            'label'      => 'HK-1',
+            'serverJson' => '{"apiUrl":"https://vpn.example.com/x"}',
+        ]);
+
+        $expectedExpiry = SubscriptionsService::addMonthsClamped(new \DateTimeImmutable('today'), 1)->format('Y-m-d');
+
+        $result->assertStatus(200);
+        $this->assertSame(['new-id', 'https://derived.example.com/x', $expectedExpiry], $this->subscriptions->importArgs[0]);
+
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame(3, $decoded['import']['imported']);
+        $this->assertSame(1, $decoded['import']['failed']);
+        $this->assertSame('bad-key', $decoded['import']['failures'][0]['name']);
     }
 
     public function testStorePassesNullPublicHostWhenOmitted(): void

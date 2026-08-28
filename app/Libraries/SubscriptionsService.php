@@ -84,6 +84,31 @@ class SubscriptionsService
     }
 
     /**
+     * Import every live Outline key on a server as an active subscription,
+     * continuing past individual Cockpit write failures.
+     *
+     * @return array{imported: int, failed: int, failures: array<int, array{name: string, error: string}>}
+     */
+    public function importAllFromServer(string $serverId, string $apiUrl, \DateTimeImmutable $expiryDate): array
+    {
+        $imported  = 0;
+        $failed    = 0;
+        $failures  = [];
+
+        foreach ($this->outline->listKeys($apiUrl) as $key) {
+            try {
+                $this->createFromOutlineKey($serverId, $key, $expiryDate);
+                $imported++;
+            } catch (\Throwable $e) {
+                $failed++;
+                $failures[] = ['name' => (string) ($key['name'] ?? ''), 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['imported' => $imported, 'failed' => $failed, 'failures' => $failures];
+    }
+
+    /**
      * Active subscriptions whose expiry is more than the configured grace
      * period in the past — the records the expiry job should process.
      *

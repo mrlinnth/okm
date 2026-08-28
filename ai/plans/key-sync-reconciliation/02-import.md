@@ -3,7 +3,7 @@
 Depends on: Phase 1 (`createFromOutlineKey()`), Saved servers registry
 (`POST /servers`, `app/Controllers/Servers.php`).
 
-### Task [2.1]: Auto-import existing keys when a server is added
+### Task [2.1]: Auto-import existing keys when a server is added [DONE]
 
 #### Subtasks
 
