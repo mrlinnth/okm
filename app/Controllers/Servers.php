@@ -79,12 +79,28 @@ class Servers extends WebController
 
     public function activate(string $id): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        return $this->updateActive($id, true);
     }
 
     public function deactivate(string $id): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        return $this->updateActive($id, false);
+    }
+
+    /**
+     * Immediate toggle — no confirmation. SavedServersService::setActive
+     * writes `active` to Cockpit and invalidates the collection cache, so
+     * the next list reflects the change.
+     */
+    private function updateActive(string $id, bool $active): ResponseInterface
+    {
+        try {
+            $server = Services::savedServers()->setActive($id, $active);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
+
+        return $this->response->setJSON($this->presentServer($server));
     }
 
     public function delete(string $id): ResponseInterface

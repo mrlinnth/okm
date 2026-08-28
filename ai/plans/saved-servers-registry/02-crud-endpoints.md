@@ -51,7 +51,7 @@ attempted when validation fails first (faked `SavedServersService` asserts
 
 ---
 
-### Task [2.3]: Activate / deactivate endpoints
+### Task [2.3]: Activate / deactivate endpoints [DONE]
 
 #### Subtasks
 

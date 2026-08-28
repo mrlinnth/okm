@@ -195,17 +195,31 @@ final class ServersControllerTest extends CIUnitTestCase
         $result->assertJSONFragment(['error' => 'Could not reach the Outline server at https://vpn.example.com/x.']);
     }
 
-    // --- Tasks 2.3 / 2.4: stubs until implemented ---------------------
+    // --- Task 2.3: activate / deactivate ----------------------------
 
-    public function testActivateStub(): void
+    public function testActivatePassesTrueToSetActiveAndReturnsUpdatedRecord(): void
     {
-        $this->post('/servers/abc/activate')->assertStatus(200);
+        $result = $this->post('/servers/srv-9/activate');
+
+        $result->assertStatus(200);
+        $this->assertSame(['srv-9', true], $this->servers->setActiveArgs[0]);
+
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame('srv-9', $decoded['id']);
+        $this->assertTrue($decoded['active']);
+        $this->assertArrayNotHasKey('serverJson', $decoded);
     }
 
-    public function testDeactivateStub(): void
+    public function testDeactivatePassesFalseToSetActive(): void
     {
-        $this->post('/servers/abc/deactivate')->assertStatus(200);
+        $result = $this->post('/servers/srv-9/deactivate');
+
+        $result->assertStatus(200);
+        $this->assertSame(['srv-9', false], $this->servers->setActiveArgs[0]);
+        $this->assertFalse(json_decode($result->getJSON(), true)['active']);
     }
+
+    // --- Task 2.4: delete (stub until implemented) ------------------
 
     public function testDeleteStub(): void
     {
