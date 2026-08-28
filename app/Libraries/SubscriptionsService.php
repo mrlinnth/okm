@@ -214,6 +214,41 @@ class SubscriptionsService
     }
 
     /**
+     * Create and persist a replacement key before best-effort cleanup of the
+     * old one. This preserves a working key when source cleanup fails.
+     *
+     * @param array<string, mixed> $subscription
+     * @return array<string, mixed>
+     */
+    protected function replaceKey(array $subscription, string $targetServerId): array
+    {
+        $targetServer = $this->findActiveServer($targetServerId);
+        $oldServer = $this->findActiveServer((string) $subscription['serverId']);
+        $newKey = $this->outline->createKey((string) $targetServer['apiUrl'], (string) $subscription['keyName']);
+
+        $changes = [
+            'outlineKeyId' => $newKey['id'],
+            'accessUrl'    => $newKey['accessUrl'],
+        ];
+        if ($targetServerId !== (string) $subscription['serverId']) {
+            $changes['serverId'] = $targetServerId;
+        }
+
+        $updated = $this->cockpit->updateItem('subscriptions', (string) $subscription['_id'], $changes);
+        if ($updated === null) {
+            throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+        }
+
+        try {
+            $this->outline->deleteKeyById((string) $oldServer['apiUrl'], (string) $subscription['outlineKeyId']);
+        } catch (\Throwable $e) {
+            $updated['warning'] = 'The old Outline key could not be deleted: ' . $e->getMessage();
+        }
+
+        return $updated;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array

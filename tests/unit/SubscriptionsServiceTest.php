@@ -207,6 +207,52 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         $this->assertArrayNotHasKey('expiryDate', $cockpit->update);
     }
 
+    public function testReplaceKeyRecordsTheNewKeyBeforeDeletingTheOldOne(): void
+    {
+        $events = [];
+        $cockpit = new class($events) extends CockpitService {
+            public function __construct(private array &$events) {}
+            public function updateItem(string $model, string $id, array $data): ?array { $this->events[] = 'update'; return array_merge(['_id' => $id], $data); }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'source', 'apiUrl' => 'https://source.example/api', 'active' => true], ['_id' => 'destination', 'apiUrl' => 'https://destination.example/api', 'active' => true]]; } };
+        $outline = new class($events) extends OutlineService {
+            public function __construct(private array &$events) {}
+            public function createKey(string $apiUrl, string $name): array { $this->events[] = 'create'; return ['id' => 'new-key', 'accessUrl' => 'ss://new', 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; }
+            public function deleteKeyById(string $apiUrl, string $id): void { $this->events[] = 'delete'; }
+        };
+        $service = new class($cockpit, $servers, $outline) extends SubscriptionsService {
+            public function replace(array $subscription, string $targetServerId): array { return $this->replaceKey($subscription, $targetServerId); }
+        };
+
+        $result = $service->replace(['_id' => 'sub-1', 'serverId' => 'source', 'outlineKeyId' => 'old-key', 'keyName' => 'alice-key'], 'destination');
+
+        $this->assertSame(['create', 'update', 'delete'], $events);
+        $this->assertSame('destination', $result['serverId']);
+        $this->assertArrayNotHasKey('warning', $result);
+    }
+
+    public function testReplaceKeyReturnsWarningWhenOldKeyCleanupFails(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function updateItem(string $model, string $id, array $data): ?array { return array_merge(['_id' => $id], $data); }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'source', 'apiUrl' => 'https://source.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService {
+            public function __construct() {}
+            public function createKey(string $apiUrl, string $name): array { return ['id' => 'new-key', 'accessUrl' => 'ss://new', 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; }
+            public function deleteKeyById(string $apiUrl, string $id): void { throw new \RuntimeException('source unavailable'); }
+        };
+        $service = new class($cockpit, $servers, $outline) extends SubscriptionsService {
+            public function replace(array $subscription, string $targetServerId): array { return $this->replaceKey($subscription, $targetServerId); }
+        };
+
+        $result = $service->replace(['_id' => 'sub-1', 'serverId' => 'source', 'outlineKeyId' => 'old-key', 'keyName' => 'alice-key'], 'source');
+
+        $this->assertSame('new-key', $result['outlineKeyId']);
+        $this->assertSame('The old Outline key could not be deleted: source unavailable', $result['warning']);
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

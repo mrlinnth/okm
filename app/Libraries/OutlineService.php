@@ -89,6 +89,17 @@ class OutlineService
     {
         $id = $this->resolveKeyIdByName($apiUrl, $name);
 
+        $this->deleteKeyById($apiUrl, $id);
+    }
+
+    /**
+     * Delete a specific access key by its stable Outline ID.
+     *
+     * This is needed when two live keys intentionally share a display name
+     * during create-before-destroy replacement operations.
+     */
+    public function deleteKeyById(string $apiUrl, string $id): void
+    {
         $this->request('DELETE', $apiUrl, "/access-keys/{$id}");
     }
 

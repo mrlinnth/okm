@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 4.1 (Shared create-before-destroy helper)
-- **Branch**: feature-subscription-ledger-lifecycle
+- **Task**: 4.2 (Reroll)
+- **Branch**: feature-subscription-ledger-phase-4
 - **Started**: 2026-08-28
-- **Status**: Implementing Phase 3 subscription lifecycle endpoints
+- **Status**: Implementing Phase 4 reroll endpoint
 
 ### Notes
 
@@ -34,11 +34,12 @@
 - Task 3.3 is complete: disable removes the current Outline key before
   marking the record disabled; enable creates a replacement key without
   changing the expiry date.
-- Docker verification passed: focused Phase 3 tests (25/25).
+- Task 4.1 is complete: replacement keys are saved before old-key cleanup;
+  failed cleanup yields a warning while preserving the new active key.
+- Docker verification passed: focused subscription service tests (18/18).
 
 ## Up Next
 
-- 4.1: Shared create-before-destroy helper
 - 4.2: Reroll key
 - 4.3: Move subscription
 - 4.4: Delete subscription

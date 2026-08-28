@@ -3,7 +3,7 @@
 Depends on: Phase 3 (Enable/Disable establishes the create/delete-key
 primitives this phase reuses).
 
-### Task [4.1]: Shared create-before-destroy helper
+### Task [4.1]: Shared create-before-destroy helper [DONE]
 
 #### Subtasks
 
