@@ -82,7 +82,7 @@ missing, or the same as the current server.
 
 ---
 
-### Task [4.4]: Delete
+### Task [4.4]: Delete [DONE]
 
 #### Subtasks
 

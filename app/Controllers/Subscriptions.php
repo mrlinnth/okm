@@ -169,7 +169,15 @@ class Subscriptions extends WebController
 
     public function delete(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        try {
+            Services::subscriptions()->delete($id);
+
+            return $this->response->setJSON(['success' => true]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (OutlineRequestException | \RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     /**

@@ -331,6 +331,35 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         ];
     }
 
+    /**
+     * @dataProvider deleteSubscriptionCases
+     */
+    public function testDeleteRemovesAnActiveKeyBeforeItsCockpitRecord(string $status, array $expectedEvents): void
+    {
+        $events = [];
+        $cockpit = new class($events, $status) extends CockpitService {
+            public function __construct(private array &$events, private string $status) {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'status' => $this->status, 'serverId' => 'server', 'outlineKeyId' => 'key-1']; }
+            public function deleteItem(string $model, string $id): bool { $this->events[] = 'cockpit'; return true; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'server', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class($events) extends OutlineService { public function __construct(private array &$events) {} public function deleteKeyById(string $apiUrl, string $id): void { $this->events[] = 'outline'; } };
+
+        (new SubscriptionsService($cockpit, $servers, $outline))->delete('sub-1');
+
+        $this->assertSame($expectedEvents, $events);
+    }
+
+    /** @return array<string, array{0: string, 1: array<int, string>}> */
+    public static function deleteSubscriptionCases(): array
+    {
+        return [
+            'active subscription' => ['active', ['outline', 'cockpit']],
+            'disabled subscription' => ['disabled', ['cockpit']],
+            'expired subscription' => ['expired', ['cockpit']],
+        ];
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 4.4 (Delete subscription)
+- **Task**: 5.1 (Ledger scaffold and filters)
 - **Branch**: feature-subscription-ledger-phase-4
 - **Started**: 2026-08-28
-- **Status**: Implementing Phase 4 delete endpoint
+- **Status**: Phase 4 complete; ready to implement Phase 5 ledger UI
 
 ### Notes
 
@@ -40,11 +40,13 @@
   disabled and expired subscriptions are rejected.
 - Task 4.3 is complete: moves validate an active, different destination then
   safely replace the key on that server.
-- Docker verification passed: focused subscription service/controller tests (36/36).
+- Task 4.4 is complete: active subscriptions delete their stable Outline key
+  before Cockpit removal; disabled and expired records only remove Cockpit data.
+- Docker verification passed: full PHPUnit suite (109/109).
 
 ## Up Next
 
-- 4.4: Delete subscription
+- 5.1: Ledger scaffold and filters
 
 ## Blockers
 

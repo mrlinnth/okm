@@ -32,6 +32,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
             public array $disableArgs = [];
             public array $rerollArgs = [];
             public array $moveArgs = [];
+            public array $deleteArgs = [];
 
             public function __construct()
             {
@@ -98,6 +99,11 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->moveArgs = [$id, $destinationServerId];
 
                 return ['_id' => $id, 'serverId' => $destinationServerId];
+            }
+
+            public function delete(string $id): void
+            {
+                $this->deleteArgs = [$id];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -228,5 +234,14 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 
         $result->assertStatus(422);
         $this->assertSame([], $this->subscriptions->moveArgs);
+    }
+
+    public function testDeletePassesSubscriptionToService(): void
+    {
+        $result = $this->post('/subscriptions/sub-1/delete');
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1'], $this->subscriptions->deleteArgs);
+        $result->assertJSONFragment(['success' => true]);
     }
 }

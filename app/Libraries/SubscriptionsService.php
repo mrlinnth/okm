@@ -281,6 +281,24 @@ class SubscriptionsService
     }
 
     /**
+     * Permanently remove a subscription, deleting its live key first when
+     * the subscription is active.
+     */
+    public function delete(string $id): void
+    {
+        $subscription = $this->findSubscription($id);
+
+        if (($subscription['status'] ?? null) === 'active') {
+            $server = $this->findActiveServer((string) $subscription['serverId']);
+            $this->outline->deleteKeyById((string) $server['apiUrl'], (string) $subscription['outlineKeyId']);
+        }
+
+        if (!$this->cockpit->deleteItem('subscriptions', $id)) {
+            throw new \RuntimeException('Failed to delete the subscription from Cockpit.');
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array
