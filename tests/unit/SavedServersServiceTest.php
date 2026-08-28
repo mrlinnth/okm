@@ -18,6 +18,9 @@ final class FakeOutlineForSavedServers extends OutlineService
     /** @var array<int, string> */
     public array $listKeysCalledWith = [];
 
+    /** @var array<int, array<string, mixed>> */
+    public array $keys = [];
+
     public function listKeys(string $apiUrl): array
     {
         $this->listKeysCalledWith[] = $apiUrl;
@@ -26,7 +29,7 @@ final class FakeOutlineForSavedServers extends OutlineService
             throw new OutlineRequestException('Outline request failed: could not connect');
         }
 
-        return [];
+        return $this->keys;
     }
 }
 
@@ -46,6 +49,9 @@ final class FakeCockpitForSavedServers extends CockpitService
 
     /** @var array<int, array<string, mixed>> */
     public array $collection = [];
+
+    /** @var array<string, array<int, array<string, mixed>>> */
+    public array $collections = [];
 
     public bool $createFails = false;
 
@@ -76,7 +82,7 @@ final class FakeCockpitForSavedServers extends CockpitService
 
     public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
     {
-        return $this->collection;
+        return $this->collections[$model] ?? $this->collection;
     }
 }
 
@@ -219,5 +225,55 @@ final class SavedServersServiceTest extends CIUnitTestCase
         $this->cockpit->collection = [['_id' => '1', 'label' => 'A']];
 
         $this->assertSame([['_id' => '1', 'label' => 'A']], $this->service->list());
+    }
+
+    public function testDiffServerCategorizesLiveKeysAndLedgerRecords(): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'srv-1', 'apiUrl' => 'https://vpn.example.com/x'],
+        ];
+        $this->cockpit->collections['subscriptions'] = [
+            ['_id' => 'sub-synced', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-synced'],
+            ['_id' => 'sub-orphan', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-gone'],
+        ];
+        $this->outline->keys = [
+            ['id' => 'key-synced', 'name' => 'alice', 'accessUrl' => 'ss://synced'],
+            ['id' => 'key-extra', 'name' => 'manual-key', 'accessUrl' => 'ss://extra'],
+        ];
+
+        $diff = $this->service->diffServer('srv-1');
+
+        $this->assertSame(['https://vpn.example.com/x'], $this->outline->listKeysCalledWith);
+        $this->assertSame(
+            [['id' => 'key-extra', 'name' => 'manual-key', 'accessUrl' => 'ss://extra']],
+            $diff['foundOnServer'],
+        );
+        $this->assertSame(['sub-orphan'], array_column($diff['missingOnServer'], '_id'));
+    }
+
+    public function testDiffServerReturnsEmptySectionsWhenEverythingMatches(): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'srv-1', 'apiUrl' => 'https://vpn.example.com/x'],
+        ];
+        $this->cockpit->collections['subscriptions'] = [
+            ['_id' => 'sub-1', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-1'],
+        ];
+        $this->outline->keys = [
+            ['id' => 'key-1', 'name' => 'alice', 'accessUrl' => 'ss://1'],
+        ];
+
+        $diff = $this->service->diffServer('srv-1');
+
+        $this->assertSame([], $diff['foundOnServer']);
+        $this->assertSame([], $diff['missingOnServer']);
+    }
+
+    public function testDiffServerRejectsAnUnknownServer(): void
+    {
+        $this->cockpit->collections['servers'] = [];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->diffServer('missing');
     }
 }

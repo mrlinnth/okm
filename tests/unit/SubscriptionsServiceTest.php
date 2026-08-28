@@ -101,6 +101,49 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         ];
     }
 
+    public function testCreateFromOutlineKeyMirrorsTheKeyNameAndUsesTheGivenExpiry(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $createArgs = [];
+            public function __construct() {}
+            public function createItem(string $model, array $data): ?array
+            {
+                $this->createArgs = [$model, $data];
+
+                return array_merge(['_id' => 'sub-1'], $data);
+            }
+        };
+
+        $created = (new SubscriptionsService($cockpit))->createFromOutlineKey(
+            'srv-1',
+            ['id' => 'key-9', 'name' => 'manual-key', 'accessUrl' => 'ss://key-9'],
+            new \DateTimeImmutable('2026-09-30'),
+        );
+
+        [$model, $data] = $cockpit->createArgs;
+        $this->assertSame('subscriptions', $model);
+        $this->assertSame('manual-key', $data['recipientName']);
+        $this->assertSame('manual-key', $data['keyName']);
+        $this->assertSame('srv-1', $data['serverId']);
+        $this->assertSame('key-9', $data['outlineKeyId']);
+        $this->assertSame('ss://key-9', $data['accessUrl']);
+        $this->assertSame('active', $data['status']);
+        $this->assertSame('2026-09-30', $data['expiryDate']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{32}$/', $data['token']);
+        $this->assertSame('sub-1', $created['_id']);
+    }
+
+    public function testCreateFromOutlineKeyThrowsWhenCockpitWriteFails(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function createItem(string $model, array $data): ?array { return null; }
+        };
+
+        $this->expectException(\RuntimeException::class);
+        (new SubscriptionsService($cockpit))->createFromOutlineKey('srv-1', ['id' => 'k', 'name' => 'n'], new \DateTimeImmutable('2026-09-30'));
+    }
+
     public function testProcessExpiryDeletesTheKeyAndMarksExpiredOnSuccess(): void
     {
         $cockpit = new class extends CockpitService {

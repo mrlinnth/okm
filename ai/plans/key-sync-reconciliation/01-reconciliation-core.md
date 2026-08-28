@@ -4,7 +4,7 @@ Depends on: Saved servers registry (`SavedServersService`, `servers`
 collection), Subscription ledger (`SubscriptionsService`, `subscriptions`
 collection), Classic key manager (`OutlineService::listKeys`).
 
-### Task [1.1]: Diff live keys against the ledger
+### Task [1.1]: Diff live keys against the ledger [DONE]
 
 #### Subtasks
 
@@ -34,7 +34,7 @@ on both sides produce no diff entries; a server-only key appears in
 
 ---
 
-### Task [1.2]: Shared subscription-creation-from-key helper
+### Task [1.2]: Shared subscription-creation-from-key helper [DONE]
 
 #### Subtasks
 

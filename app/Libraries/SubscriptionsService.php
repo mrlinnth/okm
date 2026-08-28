@@ -51,6 +51,39 @@ class SubscriptionsService
     }
 
     /**
+     * Create one active subscription from a live Outline key record
+     * (`id`, `name`, `accessUrl`). Shared by Import (on Add Server), Sync
+     * now's import action, and the reconciliation cron — none of those
+     * re-implement subscription creation from a raw key. Callers compute
+     * the expiry date; this method does no date math.
+     *
+     * @param array<string, mixed> $outlineKey
+     * @return array<string, mixed>
+     */
+    public function createFromOutlineKey(string $serverId, array $outlineKey, \DateTimeImmutable $expiryDate): array
+    {
+        $name = (string) ($outlineKey['name'] ?? '');
+
+        $subscription = $this->cockpit->createItem('subscriptions', [
+            'recipientName' => $name,
+            'keyName'       => $name,
+            'notes'         => '',
+            'serverId'      => $serverId,
+            'outlineKeyId'  => (string) ($outlineKey['id'] ?? ''),
+            'accessUrl'     => (string) ($outlineKey['accessUrl'] ?? ''),
+            'status'        => 'active',
+            'expiryDate'    => $expiryDate->format('Y-m-d'),
+            'token'         => self::generateToken(),
+        ]);
+
+        if ($subscription === null) {
+            throw new \RuntimeException('Failed to save the subscription to Cockpit.');
+        }
+
+        return $subscription;
+    }
+
+    /**
      * Active subscriptions whose expiry is more than the configured grace
      * period in the past — the records the expiry job should process.
      *

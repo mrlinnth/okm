@@ -2,33 +2,31 @@
 
 ## Current
 
-- **Feature**: automated-expiry-job
-- **Task**: Complete
-- **Branch**: feature-automated-expiry-job
+- **Feature**: key-sync-reconciliation
+- **Task**: 2.1 (Auto-import existing keys when a server is added)
+- **Branch**: feature-key-sync-reconciliation
 - **Started**: 2026-08-28
-- **Status**: Automated expiry job feature complete (all 3 tasks)
+- **Status**: Phase 1 (reconciliation core) complete; starting Phase 2 (import)
 
 ### Notes
 
-- Task 1.1: `Config\Expiry` (gracePeriodDays = 3), `OutlineRequestException`
-  carries a `notFound` flag (`isNotFound()`), `OutlineService::deleteKey()`
-  throws `notFound: true` when the key is already gone, and
-  `SubscriptionsService::findExpirable()` / `processExpiry()` scan and
-  process eligible records. `processExpiry()` resolves the server via a new
-  `findServerById()` helper (no active check — deactivated servers still
-  hold live keys); a not-found delete counts as success, a genuine failure
-  leaves the record untouched.
-- Task 1.2: `app/Commands/ExpireSubscriptions.php` → `php spark
-subscriptions:expire`. Iterates `findExpirable()` → `processExpiry()`,
-  logs failed outcomes, continues past failures, prints `Expired: N,
-Failed: M`. Cron note (00:05 UTC daily) in the command docblock.
-- Task 1.3: `resolveRecipientState()` now has an explicit
-  `status === 'expired'` branch matching the derived-from-date case.
-- Verification: full suite 140 tests green.
+- Task 1.1: `SavedServersService::diffServer(serverId)` → `{foundOnServer,
+missingOnServer}`. Live keys via `OutlineService::listKeys()`,
+  subscriptions via short-TTL (60s) filtered Cockpit collection. Diff never
+  persisted. New private `findServer()` helper.
+- Task 1.2: `SubscriptionsService::createFromOutlineKey(serverId,
+outlineKey, expiryDate)` — single shared creator for Import / Sync-now
+  import / cron. `recipientName = keyName = key name`, status active,
+  generated token, caller supplies the date (no date math inside).
+- Verification: full suite 145 tests green.
 
 ## Up Next
 
-- key-sync-reconciliation (0/13) — the remaining planned feature.
+- 2.1: Import on Add Server (`Servers::store()` + `importAllFromServer()`)
+- Phase 3: Sync now endpoints (3.1 diff, 3.2 resolve found, 3.3 resolve missing)
+- Phase 4: Migrate (4.1 logic, 4.2 endpoint)
+- Phase 5: `servers:sync` cron command (5.1)
+- Phase 6: UI (6.1 sync modal + amber dot, 6.2 migrate modal, 6.3 import summary) — manual verification
 
 ## Blockers
 

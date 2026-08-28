@@ -126,4 +126,58 @@ class SavedServersService
     {
         return $this->cockpit->getCollectionCached('servers');
     }
+
+    /**
+     * Compare a saved server's live Outline keys against the subscriptions
+     * that reference it. Computed fresh every call from a short-TTL cached
+     * key list and subscription list — the diff itself is never persisted.
+     *
+     * @return array{foundOnServer: array<int, array{id: string, name: string, accessUrl: string}>, missingOnServer: array<int, array<string, mixed>>}
+     */
+    public function diffServer(string $serverId): array
+    {
+        $server  = $this->findServer($serverId);
+        $liveKeys = $this->outline->listKeys((string) $server['apiUrl']);
+
+        $subscriptions = $this->cockpit->getCollectionCached('subscriptions', [
+            'filter' => ['serverId' => $serverId],
+        ], 60);
+
+        $ledgerKeyIds = array_column($subscriptions, 'outlineKeyId');
+        $liveKeyIds   = array_column($liveKeys, 'id');
+
+        $foundOnServer = [];
+        foreach ($liveKeys as $key) {
+            if (in_array($key['id'], $ledgerKeyIds, true)) {
+                continue;
+            }
+
+            $foundOnServer[] = [
+                'id'        => (string) $key['id'],
+                'name'      => (string) ($key['name'] ?? ''),
+                'accessUrl' => (string) ($key['accessUrl'] ?? ''),
+            ];
+        }
+
+        $missingOnServer = array_values(array_filter(
+            $subscriptions,
+            static fn (array $subscription): bool => ! in_array($subscription['outlineKeyId'] ?? null, $liveKeyIds, true),
+        ));
+
+        return ['foundOnServer' => $foundOnServer, 'missingOnServer' => $missingOnServer];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function findServer(string $serverId): array
+    {
+        foreach ($this->list() as $server) {
+            if (($server['_id'] ?? null) === $serverId) {
+                return $server;
+            }
+        }
+
+        throw new \InvalidArgumentException('The selected server was not found.');
+    }
 }
