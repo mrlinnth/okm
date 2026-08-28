@@ -49,12 +49,14 @@ class BladeView
         }
 
         // Initialize BladeOne
-        // MODE_AUTO = 0: checks if compiled file has changed
+        // MODE_AUTO = 0: recompiles when the source template changes
         // MODE_SLOW = 1: always recompile (development)
-        // MODE_FAST = 2: never recompile (production)
+        // MODE_FAST = 2: never recompile — requires a prebuilt cache, which
+        //                this app has no build step for, so it 500s on a fresh
+        //                deploy with an empty writable/cache/blade
         // MODE_DEBUG = 5: always compile with identifiable filenames
 
-        $mode = ENVIRONMENT === 'production' ? BladeOne::MODE_FAST : BladeOne::MODE_AUTO;
+        $mode = ENVIRONMENT === 'development' ? BladeOne::MODE_SLOW : BladeOne::MODE_AUTO;
         $this->blade = new BladeOne($this->viewsPath, $this->cachePath, $mode);
     }
 
