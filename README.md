@@ -1,6 +1,11 @@
 # Outline Key Manager (OKM)
 
-A self-hosted tool for creating and managing Outline VPN access keys and recipient subscriptions. Built on CodeIgniter 4, Blade templating, and Cockpit CMS as the only datastore — no local database, no user accounts. Two superadmins operate it with the Cockpit API token as a shared secret; recipients get a public link to their own key.
+A self-hosted tool for creating and managing Outline VPN access keys and recipient subscriptions. Built on CodeIgniter 4, Blade templating, and Cockpit CMS as the only datastore — no local database, no user accounts. Two superadmins operate it behind a single shared password; recipients get a public link to their own key.
+
+It has two areas:
+
+- **Classic Manager** (`/`) — unauthenticated. Connect straight to an Outline server by pasting its JSON; list/create/copy/delete/migrate keys. Nothing is persisted.
+- **Subscription management** (`/manage` → `/servers`, `/subscriptions`) — behind the admin password. Saved servers, a subscription ledger, per-recipient public share links, an automated expiry job, and drift reconciliation, all stored in Cockpit.
 
 ## Requirements
 
@@ -62,11 +67,21 @@ CI_ENVIRONMENT = development
 # Cockpit CMS
 cockpit.apiUrl = https://your-cockpit-instance.com
 cockpit.apiToken = your-api-token
+
+# Admin login for /manage — REQUIRED to use subscription mode.
+# An empty value fails closed (nobody can sign in). Use a long random string.
+adminaccess.password = 'change-me'
+
+# Optional — recipient page contact footer (defaults shown)
+recipient.telegramUsername = 'okm_admin'
+recipient.viberNumber = '+959000000000'
 ```
 
 `CI_ENVIRONMENT = development` is required locally (enables debug output and is not committed). Use `production` for a deployed instance.
 
-Outline servers are **not** configured via `.env` — each server is connected to at request time by pasting its exported JSON (see Manual Guide below). This is deliberate: it lets an admin manage multiple Outline servers without wiring credentials into the app config.
+Optional throttle knobs for the admin login: `adminaccess.maxAttempts` (default 5) and `adminaccess.throttleSeconds` (default 900).
+
+Outline servers are **not** configured via `.env` — each server is connected to at request time by pasting its exported JSON (Classic Manager), or saved once into Cockpit (Saved Servers). This is deliberate: it lets an admin manage multiple Outline servers without wiring credentials into the app config.
 
 ## Manual Guide — Classic Key Manager
 
@@ -107,18 +122,60 @@ With a server connected:
 
 ### Notes
 
-- The app never persists Outline server credentials — reconnect by re-pasting JSON each session.
+- Classic Manager never persists Outline server credentials — reconnect by re-pasting JSON each session.
 - Certificate validation is intentionally disabled for Outline connections (self-signed certs are the norm for Outline servers); this is not a bug.
 - There is no authentication on `/classic` itself in this build — treat the URL as admin-only and don't expose it publicly.
+
+## Manual Guide — Subscription Management
+
+Everything under `/servers` and `/subscriptions` is behind the admin password.
+
+### 1. Sign in
+
+Go to `/manage`, enter `adminaccess.password`. The session lasts 30 days. Failed logins are rate-limited per IP.
+
+### 2. Saved Servers (`/servers`)
+
+- **Add server** — label, optional public host, and the server JSON. The connection is validated and reachability-checked before it's saved to Cockpit. Any keys that already exist on that server are imported as active subscriptions (1-month term); the success panel reports how many.
+- **Sync now** — compares the server's live keys against the ledger. Resolve _found on server_ keys into subscriptions (optionally paste `key_name: date` lines to set expiries), or _missing on server_ rows by removing the stale record. An amber dot on a card means there's something unresolved.
+- **Migrate** — moves every subscription on the server to another active server, creating fresh keys with duplicate-name suffixing and best-effort cleanup of the old keys. One-shot; re-run if items fail.
+- **Activate / Deactivate** — immediate. **Delete** is blocked while subscriptions reference the server.
+
+### 3. Subscription ledger (`/subscriptions`)
+
+- **New subscription** — pick an active server, recipient name, key name, notes, 1–3 month duration. A success panel gives the copyable recipient link.
+- Per row: **Copy key**, **Copy link**, and a menu — Extend, Move, Reroll key, Enable/Disable, Delete. The key name links to the recipient page.
+- Filter by recipient text, status, saved server, and "expiring soon".
+
+### 4. Recipient page (`/s/{token}`)
+
+Public, no login, Myanmar copy. Shows the access key + copy button while active and unexpired; an unavailable state otherwise. The Telegram/Viber footer links come from `recipient.telegramUsername` / `recipient.viberNumber`.
+
+### 5. Scheduled jobs
+
+Two Spark commands are meant to run from cron (the app does not install them):
+
+```cron
+5  0 * * *  cd /path/to/okm && php spark subscriptions:expire
+10 0 * * *  cd /path/to/okm && php spark servers:sync
+```
+
+- `subscriptions:expire` — deletes the Outline key and marks `expired` for any subscription past `expiryDate + Config\Expiry::$gracePeriodDays` (default 3 days). Retries failures on the next run.
+- `servers:sync` — runs the _Sync now_ diff across every active server, auto-importing orphan keys and auto-removing stale records.
+
+Run in Docker with `docker compose exec cli php spark <command>`.
 
 ## Available Services
 
 ```php
 use Config\Services;
 
-$this->cockpit  // or Services::cockpit()  - Cockpit CMS API client
-$this->outline  // or Services::outline()  - Outline VPN API client
-$this->blade    // or Services::blade()    - Blade templating
+Services::cockpit()       // Cockpit CMS API client
+Services::outline()       // Outline VPN API client (SSRF-safe)
+Services::blade()         // Blade templating
+Services::savedServers()  // Saved Servers registry + diff/migrate
+Services::subscriptions() // Subscription ledger + expiry/reconciliation
+Services::adminAccess()   // Shared-password validation + throttling
 ```
 
 ### Cockpit CMS Methods
@@ -133,9 +190,12 @@ $this->cockpit->getCollectionCached($name, $filter, $ttl);
 ```php
 Services::outline()->listKeys($apiUrl);
 Services::outline()->createKey($apiUrl, $name);
-Services::outline()->deleteKey($apiUrl, $name);
+Services::outline()->renameKey($apiUrl, $id, $name);
+Services::outline()->deleteKey($apiUrl, $name);       // by name
+Services::outline()->deleteKeyById($apiUrl, $id);     // by id
 Services::outline()->deleteAllKeys($apiUrl);
 Services::outline()->migrateKeys($sourceKeys, $destApiUrl, $onlyNames);
+Services::outline()->resolveUniqueName($name, $existing, $reserved);
 ```
 
 ## Controller Pattern

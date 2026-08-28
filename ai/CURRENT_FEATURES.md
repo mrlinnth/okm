@@ -1,150 +1,222 @@
-# Outline Key Manager — Current Feature Handoff
+# Outline Key Manager — Current Feature Inventory
 
-**Purpose:** a source-verified description of the application as implemented on this branch. It is a baseline for defining a future version, not a proposed scope or a promise of future behavior.
+**Purpose:** a source-verified description of the application as implemented
+on `develop`. This replaces the earlier inventory, which described the
+pre-rewrite React/Express app used as the planning baseline.
 
 ## Product at a glance
 
-Outline Key Manager is a self-hosted web application for operating [Outline](https://getoutline.org/) VPN access keys. It has two modes:
+Outline Key Manager (OKM) is a self-hosted web app for operating
+[Outline](https://getoutline.org/) VPN access keys. It has two areas:
 
-1. **Classic manager** is always available and lets someone connect directly to an Outline management API using its exported server JSON.
-2. **Subscription management** appears only when Cockpit CMS credentials and the related environment variables are configured. It adds saved servers, an admin-only subscription ledger, recipient share links, and expiry automation.
+1. **Classic Manager** (`/classic`, also `/`) — always available,
+   unauthenticated. Connect straight to an Outline management API by pasting
+   its exported server JSON; list, create, copy, delete, and migrate keys.
+   No state is persisted; everything lives in the browser for that session.
+2. **Subscription management** (`/manage`, `/servers`, `/subscriptions`) —
+   gated by a shared admin password. Saved Outline servers, a subscription
+   ledger, per-recipient public share links, an expiry job, and drift
+   reconciliation. All records are stored in Cockpit CMS v2.
 
-The application has no database of its own. Classic-mode state exists only in the browser. Subscription-mode server and subscription records are stored in Cockpit CMS v2.
+There is no local database and no user accounts. Recipients reach their own
+key through a public tokenised URL with no login and no secret phrase.
 
 ## Technology and deployment
 
-| Area | Current implementation |
-| --- | --- |
-| Frontend | React 18 single-page application, built with Vite 5; JavaScript function components and hooks |
-| Routing | `react-router-dom` browser routes |
-| UI | Plain CSS with shared controls, panels, alerts, badges, and responsive table wrappers |
-| QR codes | `qrcode.react` renders share-link and access-key QR codes |
-| Backend | Node.js 20 + Express 4, ES modules |
-| Outline integration | Native `https.request`, with a 10-second timeout and TLS certificate verification disabled for self-signed Outline servers |
-| Subscription datastore | Cockpit CMS v2 Content API over HTTP/2 |
-| Production | Multi-stage Docker build; Express serves the built SPA and API from one container on port 3000 |
-| Development | Vite dev server proxies `/api` to Express; a separate host-network Compose file supports Outline servers reachable only through a local VPN tunnel |
-
-The repo includes a web-app manifest, standalone display mode, and 192/512px icons. There is no service-worker implementation in the source, so offline behavior is not implemented.
+| Area                 | Implementation                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language / framework | PHP 8.5 (`strict_types` everywhere), CodeIgniter 4.6                                                                                                          |
+| Templating           | BladeOne 4.x (`@extends`/`@section`, `Services::blade()`)                                                                                                     |
+| Frontend             | Server-rendered Blade + Alpine.js 3 (CDN) + htmx 2 (CDN); no build-time JS bundle                                                                             |
+| CSS                  | Tailwind CSS v4 + daisyUI v5, compiled to `public/css/output.css` (`npm run build:css`), cache-busted by file mtime                                           |
+| Datastore            | Cockpit CMS v2 Content API over HTTPS — `servers` and `subscriptions` collections (the app does not provision the models)                                     |
+| Outline integration  | SSRF-safe cURL client: HTTPS-only, DNS-resolve-before-connect, blocked-range rejection, IP pinning; TLS verification disabled for self-signed Outline servers |
+| Dev / deploy         | Docker Compose — `web` on port 8080, a `cli` container for `phpunit` / `spark`. `php spark serve` also works locally.                                         |
+| Background jobs      | Two Spark commands run from OS cron (not installed by the app)                                                                                                |
 
 ## User-facing functionality
 
-### Classic Outline key manager
+### Classic Manager (`/classic`)
 
-- **Connect to an Outline server:** paste the server JSON exported by Outline Manager. Client validation requires parseable JSON with an `https://` `apiUrl`; the certificate fingerprint in the JSON is accepted but not used.
-- **Automatic key loading:** after a valid current-server connection is entered, the app fetches access keys and transfer metrics, then shows each key name and formatted usage (B, KB, MB, or GB).
-- **Create a key:** create one named key on the connected server. The backend creates it first and then performs the separate Outline rename operation required to apply the requested name.
-- **Copy an access key:** copy an individual `ss://` access URL to the clipboard, with short-lived “Copied!” feedback.
-- **Remove one key:** confirm and delete a key selected by name. The backend re-fetches the server key list to resolve the Outline key ID before deletion.
-- **Delete all keys:** confirm a destructive bulk deletion. Processing continues after per-key failures, then reports the number deleted and failed plus full failure details.
-- **Migrate keys to a new server:** load keys from the current/source server, paste destination server JSON, and batch-create corresponding destination keys.
-  - The destination is checked before work begins.
-  - Existing names are made unique with `_2`, `_3`, and later suffixes.
-  - Names allocated during the same batch are also reserved, preventing duplicate names within the batch.
-  - The batch is sequential and does not stop after an error.
-  - Results show every key, success/failure status, requested vs. final name where renamed, access URL for successes, and full error text for failures.
-  - **Retry failed keys** re-checks destination names and retains prior successes.
-  - **Start over** clears only the destination connection/results.
+- **Connect:** paste Outline server JSON. Loose client + server validation
+  (parseable JSON, `https://` `apiUrl`). The `certSha256` fingerprint is
+  accepted but unused.
+- **Key list:** on connect, fetches access keys merged with transfer
+  metrics; each row shows the name and formatted usage (B/KB/MB/GB).
+- **Create key:** create then rename (two Outline calls) to apply the name.
+- **Copy key:** copy an `ss://` URL with brief "Copied!" feedback.
+- **Delete one key** by name (re-resolves the Outline id first).
+- **Delete all keys:** confirm; continues past per-key failures; reports
+  deleted/failed counts and full failure detail.
+- **Migrate to another server:** connect a destination, pick keys (or all),
+  batch-create on the destination. Duplicate names get `_2`/`_3` suffixes
+  (names reserved within the batch too); sequential; continues past errors;
+  per-key results with requested-vs-final name and error text. **Retry
+  failed** re-runs only failures and keeps prior successes.
 
-### Optional subscription management
+### Admin access gate (`/manage`)
 
-This mode is enabled only when `COCKPIT_API_URL`, `COCKPIT_API_TOKEN`, `COOKIE_SECRET`, and `PUBLIC_BASE_URL` are supplied. Otherwise its API routes, UI, cookies, and expiry job are absent and the application remains in classic mode.
+- **Sign in:** a single shared password (`adminaccess.password`). An empty
+  value fails closed — nobody can sign in. Successful auth regenerates the
+  session and sets `adminAuthenticated`.
+- **Throttling:** failed attempts are rate-limited per IP
+  (`adminaccess.maxAttempts` / `adminaccess.throttleSeconds`, default 5 /
+  900s) via CI4's Throttler.
+- **Session:** file-based CI4 session, 30-day lifetime, id regenerated with
+  destroy on rotation.
+- **Gate:** every `/servers*` and `/subscriptions*` route runs the
+  `adminauth` + `csrf` filters. Unauthenticated `GET` redirects to
+  `/manage`; unauthenticated `POST`/JSON returns `401 {error, login}` so
+  the SPA-ish pages can bounce to the login screen.
+- **Logout:** destroys the session.
+- The nav shows a **Manage** link to guests and **Subscriptions / Saved
+  Servers / Logout** once signed in.
 
-#### Admin access and saved servers
+### Saved Servers (`/servers`)
 
-- **Admin unlock:** `/subscriptions` requires a server-issued, signed, HTTP-only cookie. The browser submits a dedicated `ADMIN_PASSWORD` when configured; otherwise the backend falls back to the Cockpit API token and emits a startup warning.
-- **Lock:** the admin can clear the browser cookie from the subscription UI.
-- **Saved-server registry:** admins can save a labeled Outline connection with an optional public-host label. Credentials are kept in Cockpit and are not returned in the normal server list.
-- **Connection validation on save:** a saved server must have a unique label, valid JSON, an HTTPS API URL, and a successful Outline key-list request.
-- **Automatic key import:** saving a server turns each already-existing Outline key into an active subscription with the key name as recipient/key name, a generated token and secret, and a one-calendar-month expiry. Imports continue after individual Cockpit write failures and show one-time share details plus failures.
-- **Server lifecycle:** active/inactive state can be toggled. A saved server cannot be deleted while subscriptions reference it; it must be deactivated instead.
-- **Saved-server migration:** choose a source and an active destination saved server. The app recreates source keys on the destination with duplicate suffix handling, processes the full set, and updates subscriptions associated with each migrated source key ID to point to the new key/server/access URL.
+- **Add server:** unique label, optional public-host label, server JSON.
+  Validated (JSON, HTTPS `apiUrl`) and reachability-checked (a live
+  key-list request) before the Cockpit `servers` record is written. The
+  stored `serverJson` credential blob is never returned to the page.
+- **Import on add:** immediately after creating the server, every existing
+  Outline key on it is turned into an active subscription (recipient name =
+  key name = the key name, generated token, `today + 1 month` expiry).
+  Continues past individual Cockpit write failures; the response carries an
+  `{imported, failed, failures[]}` summary shown in the success panel.
+- **Activate / deactivate:** immediate toggle, no confirm.
+- **Delete:** blocked (422) while any subscription references the server —
+  deactivate instead.
+- **Sync now:** compares the server's live Outline keys against its ledger
+  records and shows two sections:
+  - _Found on server, not in ledger_ — with an optional textarea for
+    `key_name: date` lines. A matched, valid, today-or-future date is used
+    as the expiry; anything else falls back to `today + 1 month`. Creates
+    one subscription per key; per-key results flip resolved rows green.
+  - _In ledger, missing on server_ — a **Remove record** button per row
+    (deletes only the Cockpit record; the Outline key is already gone).
+  - Shows "Everything's in sync" when both are empty.
+  - An amber dot on each server card marks unresolved differences
+    (best-effort check on page load; omitted if the check fails).
+- **Migrate:** move every subscription on this server (any status) to
+  another active server. Active subscriptions get a fresh key on the
+  destination (collision-suffixed, tracked within the batch), the record is
+  repointed, then the old key is best-effort deleted — a cleanup failure is
+  reported as a warning, never an item failure. Inactive subscriptions are
+  just repointed. One-shot run with a full per-subscription results panel;
+  no retry button. After a full migrate the source has zero subscriptions
+  and becomes eligible for Delete.
 
-#### Subscription ledger and lifecycle
+### Subscription ledger (`/subscriptions`)
 
-- **Create a subscription:** choose an active saved server; enter recipient name, Outline key name, optional internal notes, and a 1-, 2-, or 3-month duration. A new Outline key, Cockpit record, random landing token, and four-word secret are created.
-- **Share details:** after creation or import, show a QR code for the public link, the recipient secret, expiry, and a button that copies a ready-to-send share message.
-- **Ledger:** list subscriptions ordered by expiry with recipient/key, visible secret, saved server, editable expiry, status, share-link QR code, and actions.
-- **Search and filters:** filter the ledger by recipient-name text, status (active/disabled/expired), saved server, and active subscriptions expiring in seven days; filters can be combined and cleared.
-- **Edit recipient/key names:** update the Cockpit record; for an active subscription, changing the key name also renames the corresponding Outline key.
-- **Edit expiry:** choose today or a future date. Extension adds one calendar month from the later of now and current expiry, including correct month-end clamping.
-- **Secret controls:** copy the visible secret or reset it. Resetting creates a different generated secret and invalidates existing recipient verification cookies.
-- **QR controls:** download the per-subscription share-link QR code as PNG or copy that image when the browser supports image clipboard access.
-- **Status lifecycle:** disable an active subscription (deletes its Outline key), then enable it later (creates and records a replacement key). Expired subscriptions can also be enabled.
-- **Reroll an active key:** create a replacement key and update the ledger before trying to delete the old key. If cleanup fails, the replacement remains usable and the response displays a warning.
-- **Move an active subscription:** move it to a different active saved server using a compact, keyboard-dismissable action popover. It creates and records the new key before attempting source cleanup, preserving the new key on cleanup failure.
-- **Delete a subscription:** delete its Outline key when it is active, then permanently delete the Cockpit record. This has a browser confirmation.
-- **Automated expiry:** on subscription-enabled server startup and daily at 00:05 UTC, records that have been expired longer than the configurable grace period are processed. The job deletes each Outline key and marks successful records `expired`; it continues after failures and retries them on later runs.
+- **Create:** active saved server + recipient name + key name + optional
+  notes + 1/2/3-month duration. Creates an Outline key, a Cockpit record,
+  and an immutable landing token; a success panel shows the expiry and a
+  copyable recipient link. No QR, no secret phrase.
+- **List:** ordered by expiry. Desktop table / mobile cards. Each row:
+  recipient name (click-to-edit), key name (links to the recipient page),
+  saved server, status badge (+ "soon" within 7 days), click-to-edit
+  expiry, and actions.
+- **Actions:** Copy key, Copy link, and a kebab menu — Extend (one calendar
+  month from the later of today / current expiry, month-end clamped), Move
+  (replacement key on another active server), Reroll key (replacement key
+  on the same server), Enable/Disable, Delete (with confirm). Move / Reroll
+  create the new key before deleting the old one and surface a warning if
+  cleanup fails.
+- **Search & filters:** recipient text, status, saved server, and
+  "expiring soon" (active, within 7 days) — combinable.
+- Rename of an active subscription's key name also renames the Outline key.
 
-#### Recipient-facing public access
+### Recipient public page (`/s/{token}`)
 
-- Each subscription has a public landing route at `/s/:token`.
-- A recipient enters the supplied four-word secret phrase. Successful verification creates a signed, HTTP-only verification cookie valid for one year.
-- A verified recipient sees their name, expiry, copyable Outline access URL, and a QR code only while the subscription is active and unexpired.
-- Disabled or expired records show an unavailable state without the access URL.
+- Standalone page, Myanmar (Burmese) copy, no admin nav, no header bar.
+- **Active + unexpired:** recipient name, expiry date, the `ss://` access
+  URL, and a copy button.
+- **Disabled / expired / unknown token:** an unavailable state with no
+  access URL. `status === 'expired'` (set by the job) and a derived
+  past-`expiryDate` render identically.
+- **Contact footer:** Telegram and Viber links built from
+  `recipient.telegramUsername` and `recipient.viberNumber`.
 
-## UI and interaction model
+### Automated jobs (cron)
 
-- Classic mode uses a two-panel current-server → new-server workspace. On wide displays it includes a visual directional connector; on smaller screens panels stack.
-- Subscription mode provides a protected overview, saved-servers page, navigation back to classic tools, and a lock action.
-- Shared UI primitives supply associated form labels/hints/errors, native disabled states, semantic alerts/status badges, focusable horizontal table scroll regions, responsive layout, and visible focus treatment.
-- Async work uses button/status text such as “Loading…”, “Creating…”, “Migrating…”, and “Retrying…”. Errors are shown in the UI without simplifying the underlying API message.
-- Destructive browser actions use native confirmation dialogs. The app has no undo, recycle bin, or local client persistence; refreshing loses classic-mode inputs/results.
+- **`php spark subscriptions:expire`** — finds `active` subscriptions past
+  `expiryDate + Config\Expiry::$gracePeriodDays` (default 3), deletes each
+  Outline key, marks the record `expired`. A key that is already gone
+  counts as success; a genuine failure leaves the record untouched for the
+  next run. Logs failures, prints `Expired: N, Failed: M`.
+- **`php spark servers:sync`** — for every active saved server, runs the
+  same diff as _Sync now_: auto-imports orphan keys (`today + 1 month`
+  term) and auto-removes stale ledger records. Continues past per-server
+  and per-item failures; logs them; prints `Imported / Removed / Failed`.
+- Neither command is scheduled by the app. Suggested crontab: `5 0 * * *`
+  and `10 0 * * *` respectively.
 
 ## Backend HTTP surface
 
-### Always available
+| Method | Route                                                                   | Filters         | Purpose                    |
+| ------ | ----------------------------------------------------------------------- | --------------- | -------------------------- |
+| GET    | `/`, `/classic`                                                         | —               | Classic Manager page       |
+| POST   | `/classic/keys/{list,create,delete,delete-all,migrate}`                 | —               | Classic key operations     |
+| GET    | `/manage`                                                               | —               | Admin login page           |
+| POST   | `/manage`                                                               | csrf            | Authenticate               |
+| POST   | `/manage/logout`                                                        | adminauth, csrf | Sign out                   |
+| GET    | `/servers`                                                              | adminauth, csrf | Saved Servers page         |
+| POST   | `/servers`                                                              | adminauth, csrf | Add server (+ import)      |
+| POST   | `/servers/{id}/{activate,deactivate,delete}`                            | adminauth, csrf | Server lifecycle           |
+| POST   | `/servers/{id}/sync`                                                    | adminauth, csrf | Reconciliation diff        |
+| POST   | `/servers/{id}/sync/{import,remove}`                                    | adminauth, csrf | Resolve a diff section     |
+| POST   | `/servers/{id}/migrate`                                                 | adminauth, csrf | Bulk migrate subscriptions |
+| GET    | `/subscriptions`                                                        | adminauth, csrf | Subscription ledger page   |
+| POST   | `/subscriptions`                                                        | adminauth, csrf | Create subscription        |
+| POST   | `/subscriptions/{id}`                                                   | adminauth, csrf | Rename recipient / key     |
+| POST   | `/subscriptions/{id}/{extend,expiry,enable,disable,reroll,move,delete}` | adminauth, csrf | Lifecycle operations       |
+| GET    | `/s/{token}`                                                            | —               | Recipient public page      |
 
-| Endpoint | Behavior |
-| --- | --- |
-| `GET /api/capabilities` | Reports whether subscription mode is enabled. |
-| `POST /api/keys/list` | Lists access keys for a supplied `apiUrl`. |
-| `POST /api/keys/create` | Creates then names a key for `apiUrl` and `name`. |
-| `POST /api/keys/delete` | Deletes the first key matching `name` on `apiUrl`. |
-| `POST /api/keys/delete-all` | Lists and attempts to delete every key, returning per-key outcomes. |
-| `POST /api/keys/transfer` | Retrieves Outline transfer metrics. |
+## Security and operational behaviour
 
-### Available only in subscription mode
+- **Outline client safeguards:** HTTPS-only, DNS resolved before connect,
+  blocked ranges (loopback, link-local, cloud metadata, multicast,
+  reserved) rejected, connection pinned to the resolved IP (DNS-rebinding
+  mitigation). Configurable `SSRF_BLOCK_PRIVATE` extends this to RFC1918 /
+  CGNAT / IPv6 ULA; off by default so LAN/VPN Outline servers work.
+- **Outline TLS:** certificate validation deliberately disabled
+  (self-signed Outline servers are the norm).
+- **CSRF:** session-based tokens, non-regenerating (admin pages fire
+  several AJAX requests from one rendered token); sent via `X-CSRF-TOKEN`
+  header from a `csrf_meta()` tag rendered only for signed-in admins.
+- **Admin auth:** shared-password → signed session cookie; per-IP throttle
+  on failed logins.
+- **Credential handling:** saved-server `serverJson` is stored in Cockpit
+  and stripped from every list/JSON response and rendered page.
+- **Caching:** all Cockpit reads go through `*Cached()` helpers; the
+  reconciliation diff and recipient token lookup use a short (~60s) TTL and
+  are never persisted.
 
-| Route group | Behavior |
-| --- | --- |
-| `/api/admin` | Unlock, lock, and signed-cookie status. |
-| `/api/admin/servers` | Authenticated saved-server list/create/activation/delete operations. |
-| `/api/admin/subscriptions` | Authenticated subscription listing, creation, extension, rename, expiry edit, secret reset, reroll, move, enable/disable, delete, and saved-server migration. |
-| `/api/public/subscriptions/:token` | Recipient secret verification and verified subscription retrieval. |
+## Verification in the repository
 
-## Security and operational behavior
+- **PHPUnit** (`vendor/bin/phpunit`, run in the `cli` container): 165 tests
+  covering the Outline SSRF/HTTPS client, Cockpit client, saved-servers and
+  subscriptions services (diff, migrate, expiry, reconciliation,
+  create-before-destroy), the admin auth service and filter, all
+  controllers (feature tests with an injected admin session + CSRF), and
+  the two Spark commands.
+- Blade views are exercised through the feature tests that render them.
+- The Saved Servers Sync now / Migrate / import-summary UI has been
+  manually smoke-tested against live Outline drift.
 
-- **Outline request safeguards:** all classic Outline targets must be HTTPS. DNS is resolved before connection, blocked addresses are rejected, and the connection is pinned to the resolved IP to mitigate DNS rebinding.
-- **Always-blocked destinations:** unspecified/loopback, link-local, cloud metadata, multicast, and reserved IP ranges. `SSRF_BLOCK_PRIVATE=1` additionally blocks private RFC1918, CGNAT, and IPv6 unique-local ranges; it is off by default so LAN/VPN Outline servers remain possible.
-- **Outline TLS:** certificate validation is deliberately disabled to support self-signed Outline servers.
-- **Response headers:** CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and same-origin cross-origin opener policy are sent for all responses.
-- **Cookie properties:** admin and recipient cookies are signed, HTTP-only, `SameSite=Lax`, path-wide, and `Secure` in production.
-- **Rate limiting:** admin unlock allows 10 attempts per IP/15 minutes with a 30-attempt global cap; public secret verification allows 5 per IP/15 minutes with a 60-attempt global cap.
-- **Secret generation:** public landing tokens use random bytes; recipient secrets contain four randomly selected words. Cockpit subscription lookups by token are cached for five minutes and invalidated when relevant writes occur.
-- **Error handling:** the backend sends detailed underlying error messages to the client. Batch processes are designed to continue after individual failures.
+## Constraints, limitations, known residual risks
 
-## Verification currently in the repository
-
-- **Backend:** Node’s built-in test runner covers SSRF/HTTPS restrictions, config/capability behavior, cookies and constant-time secret comparison, rate limits, Cockpit HTTP/2 usage, saved-server import, subscription lifecycle transitions, secret reset, expiry validation/job behavior, and saved-server migration reconciliation.
-- **Frontend:** Vitest + Testing Library covers route gating, classic workspace structure, public secret verification, ledger actions/filters/editing, secret controls, QR download/copy behavior, saved-server import display, and migration feedback.
-- **UI primitives:** tests cover label/error accessibility, button state/variants, scrollable table semantics, and alert/badge semantics.
-- **Build/deploy configuration:** Docker builds the frontend then installs production backend dependencies; `docker-compose.yml` runs the production container on port 3000.
-
-## Constraints, limitations, and known residual risks
-
-These are current facts, included so that a future scope can consciously decide what to change.
-
-- The Outline certificate fingerprint (`certSha256`) is stored for saved servers but is not used for certificate pinning. Since Outline TLS verification is disabled, an on-path attacker could intercept Outline key-management traffic.
-- Classic tools are intentionally unauthenticated. A deployment that should not allow public use must enforce access control at its reverse proxy or network boundary.
-- There are no user accounts, multi-admin roles, audit logs, owned database, background queue, soft delete/undo, or client-side persistence.
-- Expiry is an in-process daily task rather than a durable job scheduler. A missed execution is retried only on a later app run.
-- The PWA metadata does not provide offline caching or install-specific behavior beyond manifest support.
-- Key operations and migrations are sequential. This makes outcomes predictable but can be slow for large key sets.
-- Some lifecycle operations can leave partial external state by design: for example, a new key may exist if a later Cockpit write fails, and old-key cleanup failures after reroll/move are reported but not automatically reconciled.
-- Subscriptions use Cockpit’s expected `servers` and `subscriptions` models; the app does not provision those models itself.
-- The current stack is JavaScript, React 18, Vite 5, Express 4, and Node 20. No TypeScript, framework upgrade, or standalone database layer is presently used.
-
-## Existing planning documents: do not treat as shipped features
-
-The repository includes historic and completed plan files under `ai/plans/` plus `TODO-v1.md`, `TODO-v2.md`, and `TODO-v3.md`. They are useful context, but this document classifies a capability as current only when it is represented in the application source, configuration, or tests. Any future scope should re-evaluate those documents against this inventory rather than assuming every listed idea is live.
+- `certSha256` is stored but not used for pinning; with TLS verification
+  off, an on-path attacker could intercept Outline management traffic.
+- `/classic` is intentionally unauthenticated — restrict it at the reverse
+  proxy / network boundary if the deployment shouldn't be public.
+- No user accounts, roles, audit log, owned database, job queue, or
+  soft-delete / undo.
+- Expiry and sync are cron-triggered Spark commands, not a durable
+  scheduler; a missed run is only retried on the next run.
+- Key operations and migrations are sequential — predictable but slow for
+  large key sets.
+- Some lifecycle operations can leave partial external state by design (a
+  new key may exist if a later Cockpit write fails; old-key cleanup
+  failures after reroll/move/migrate are reported, not auto-reconciled).
+- Cockpit `servers` / `subscriptions` models must already exist.
