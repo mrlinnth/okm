@@ -38,7 +38,7 @@ active-but-past-expiry, active-and-current), including a boundary case where
 
 ---
 
-### Task [1.2]: Controller and route
+### Task [1.2]: Controller and route [DONE]
 
 #### Subtasks
 

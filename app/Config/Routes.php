@@ -30,3 +30,5 @@ $routes->post('/subscriptions/(:segment)/disable', 'Subscriptions::disable/$1');
 $routes->post('/subscriptions/(:segment)/reroll', 'Subscriptions::reroll/$1');
 $routes->post('/subscriptions/(:segment)/move', 'Subscriptions::move/$1');
 $routes->post('/subscriptions/(:segment)/delete', 'Subscriptions::delete/$1');
+
+$routes->get('/s/(:any)', 'Recipient::show/$1');
