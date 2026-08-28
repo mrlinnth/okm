@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Libraries\SubscriptionsService;
+use App\Libraries\CockpitService;
 use CodeIgniter\Test\CIUnitTestCase;
 
 /**
@@ -10,6 +11,31 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class SubscriptionsServiceTest extends CIUnitTestCase
 {
+    public function testListUsesCockpitCollectionAndSortsByExpiryDate(): void
+    {
+        $cockpit = new class extends CockpitService {
+            /** @var array<int, array<string, mixed>> */
+            public array $rows = [
+                ['_id' => 'late', 'expiryDate' => '2026-12-01'],
+                ['_id' => 'soon', 'expiryDate' => '2026-01-01'],
+                ['_id' => 'middle', 'expiryDate' => '2026-06-01'],
+            ];
+
+            public function __construct()
+            {
+            }
+
+            public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
+            {
+                return $this->rows;
+            }
+        };
+
+        $subscriptions = (new SubscriptionsService($cockpit))->list();
+
+        $this->assertSame(['soon', 'middle', 'late'], array_column($subscriptions, '_id'));
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

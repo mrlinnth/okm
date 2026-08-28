@@ -2,7 +2,7 @@
 
 Depends on: Phase 1 (`SubscriptionsService` foundation, controller/routes).
 
-### Task [2.1]: List endpoint
+### Task [2.1]: List endpoint [DONE]
 
 #### Subtasks
 

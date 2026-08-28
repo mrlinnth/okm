@@ -4,21 +4,43 @@ declare(strict_types=1);
 
 namespace App\Libraries;
 
+use Config\Services;
+
 /**
  * Coordinates subscription lifecycle operations.
  */
 class SubscriptionsService
 {
+    protected CockpitService $cockpit;
+
+    public function __construct(?CockpitService $cockpit = null)
+    {
+        $this->cockpit = $cockpit ?? Services::cockpit();
+    }
+
     /**
      * Count subscriptions assigned to a saved Outline server.
      */
     public function countByServer(string $serverId): int
     {
-        $cockpit = \Config\Services::cockpit();
-
-        return count($cockpit->getCollectionCached('subscriptions', [
+        return count($this->cockpit->getCollectionCached('subscriptions', [
             'filter' => ['serverId' => $serverId],
         ]));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function list(): array
+    {
+        $subscriptions = $this->cockpit->getCollectionCached('subscriptions');
+
+        usort(
+            $subscriptions,
+            static fn (array $left, array $right): int => (string) ($left['expiryDate'] ?? '') <=> (string) ($right['expiryDate'] ?? ''),
+        );
+
+        return $subscriptions;
     }
 
     /**

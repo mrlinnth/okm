@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\Services;
 
 /**
  * Subscription ledger controller.
@@ -16,7 +17,16 @@ class Subscriptions extends WebController
 {
     public function index(): string
     {
-        return $this->render('subscriptions.index', ['title' => 'Subscriptions']);
+        $servers = array_values(array_filter(
+            Services::savedServers()->list(),
+            static fn (array $server): bool => (bool) ($server['active'] ?? false),
+        ));
+
+        return $this->render('subscriptions.index', [
+            'title'         => 'Subscriptions',
+            'subscriptions' => Services::subscriptions()->list(),
+            'servers'       => $servers,
+        ]);
     }
 
     public function store(): ResponseInterface

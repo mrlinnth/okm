@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 2.1 (List endpoint)
-- **Branch**: feature-subscription-ledger-foundation
+- **Task**: 2.2 (Create subscription)
+- **Branch**: feature-subscription-ledger-create-read-edit
 - **Started**: 2026-08-28
-- **Status**: Implementing Phase 1 service foundation
+- **Status**: Implementing Phase 2 create, list, and edit endpoints
 
 ### Notes
 
@@ -21,12 +21,13 @@
   service registration, and placeholder view are ready for later phases.
 - Task 1.4 is complete: saved servers with linked subscriptions return a 422
   response instead of being deleted.
+- Task 2.1 is complete: subscriptions are retrieved from Cockpit in expiry
+  order, and only active saved servers are supplied to the ledger view.
 - Docker verification passed: focused date-helper tests (4/4) and full suite
   (72/72).
 
 ## Up Next
 
-- 2.1: List endpoint
 - 2.2: Create subscription
 - 2.3: Edit recipient and key name
 
