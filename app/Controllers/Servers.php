@@ -19,7 +19,10 @@ class Servers extends WebController
 {
     public function index(): string
     {
-        $servers = Services::savedServers()->list();
+        $servers = array_map(
+            fn (array $server): array => $this->presentServer($server),
+            Services::savedServers()->list(),
+        );
 
         return $this->render('servers.index', [
             'title'   => 'Saved Servers',
@@ -30,6 +33,25 @@ class Servers extends WebController
     public function store(): ResponseInterface
     {
         return $this->response->setJSON([]);
+    }
+
+    /**
+     * Trim a raw Cockpit `servers` item to the fields the UI needs. Notably
+     * drops `serverJson` so the full credential payload never reaches the
+     * rendered page or a JSON response.
+     *
+     * @param array<string, mixed> $server
+     * @return array{id: string, label: string, apiUrl: string, publicHost: string, active: bool}
+     */
+    private function presentServer(array $server): array
+    {
+        return [
+            'id'         => (string) ($server['_id'] ?? ''),
+            'label'      => (string) ($server['label'] ?? ''),
+            'apiUrl'     => (string) ($server['apiUrl'] ?? ''),
+            'publicHost' => (string) ($server['publicHost'] ?? ''),
+            'active'     => (bool) ($server['active'] ?? false),
+        ];
     }
 
     public function activate(string $id): ResponseInterface

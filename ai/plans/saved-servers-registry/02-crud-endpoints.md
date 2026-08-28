@@ -2,7 +2,7 @@
 
 Depends on: Phase 1 (`SavedServersService`, `Servers` controller/routes).
 
-### Task [2.1]: List endpoint
+### Task [2.1]: List endpoint [DONE]
 
 #### Subtasks
 
@@ -56,7 +56,7 @@ attempted when validation fails first (faked `SavedServersService` asserts
 #### Subtasks
 
 - [ ] Implement `Servers::activate(string $id)` and `Servers::deactivate
-    (string $id)`: call `SavedServersService::setActive($id, true|false)`,
+  (string $id)`: call `SavedServersService::setActive($id, true|false)`,
       return the updated record as JSON. No confirmation needed
       server-side (matches immediate-toggle UX from requirements).
 
