@@ -102,7 +102,19 @@ class Subscriptions extends WebController
 
     public function setExpiry(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        $body = $this->request->getJSON(true) ?? [];
+        $date = $this->parseDate($body['date'] ?? null);
+        if ($date === null) {
+            return $this->errorResponse(422, 'date must be a valid Y-m-d date.');
+        }
+
+        try {
+            return $this->response->setJSON(Services::subscriptions()->setExpiry($id, $date));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     public function enable(string $id): ResponseInterface
@@ -160,5 +172,21 @@ class Subscriptions extends WebController
     private function errorResponse(int $status, string $message): ResponseInterface
     {
         return $this->response->setStatusCode($status)->setJSON(['error' => $message]);
+    }
+
+    private function parseDate(mixed $value): ?\DateTimeImmutable
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        $errors = \DateTimeImmutable::getLastErrors();
+
+        if ($date === false || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+            return null;
+        }
+
+        return $date->format('Y-m-d') === $value ? $date : null;
     }
 }

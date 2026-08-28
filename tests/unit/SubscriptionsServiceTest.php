@@ -137,6 +137,41 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         ];
     }
 
+    public function testSetExpiryPersistsAnExactFutureDate(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $update = [];
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id]; }
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $service = new class($cockpit) extends SubscriptionsService {
+            public function __construct(CockpitService $cockpit) { parent::__construct($cockpit); }
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable('2026-08-28'); }
+        };
+
+        $service->setExpiry('sub-1', new \DateTimeImmutable('2026-10-15'));
+
+        $this->assertSame(['expiryDate' => '2026-10-15'], $cockpit->update);
+    }
+
+    public function testSetExpiryRejectsPastDate(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id]; }
+        };
+        $service = new class($cockpit) extends SubscriptionsService {
+            public function __construct(CockpitService $cockpit) { parent::__construct($cockpit); }
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable('2026-08-28'); }
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('expiryDate must be today or later.');
+
+        $service->setExpiry('sub-1', new \DateTimeImmutable('2026-08-27'));
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

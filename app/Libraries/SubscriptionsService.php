@@ -148,6 +148,29 @@ class SubscriptionsService
     }
 
     /**
+     * Set a subscription expiry date, rejecting dates before today.
+     *
+     * @return array<string, mixed>
+     */
+    public function setExpiry(string $id, \DateTimeImmutable $date): array
+    {
+        $this->findSubscription($id);
+
+        if ($date < $this->today()) {
+            throw new \InvalidArgumentException('expiryDate must be today or later.');
+        }
+
+        $updated = $this->cockpit->updateItem('subscriptions', $id, [
+            'expiryDate' => $date->format('Y-m-d'),
+        ]);
+        if ($updated === null) {
+            throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+        }
+
+        return $updated;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array

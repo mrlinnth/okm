@@ -27,7 +27,7 @@ month from today; a month-end case clamps correctly.
 
 ---
 
-### Task [3.2]: Inline expiry edit
+### Task [3.2]: Inline expiry edit [DONE]
 
 #### Subtasks
 

@@ -3,7 +3,7 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 3.2 (Inline expiry edit)
+- **Task**: 3.3 (Enable and disable)
 - **Branch**: feature-subscription-ledger-lifecycle
 - **Started**: 2026-08-28
 - **Status**: Implementing Phase 3 subscription lifecycle endpoints
@@ -29,11 +29,12 @@
   Cockpit updates; disabled subscriptions update Cockpit only.
 - Task 3.1 is complete: extending starts from the later of today or the
   current expiry and uses month-end-safe date math.
-- Docker verification passed: focused Phase 3 tests (17/17).
+- Task 3.2 is complete: the expiry endpoint accepts exact valid ISO dates
+  and rejects past or malformed dates with a 422 response.
+- Docker verification passed: focused Phase 3 tests (21/21).
 
 ## Up Next
 
-- 3.2: Inline expiry edit
 - 3.3: Enable and disable
 
 ## Blockers

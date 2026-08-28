@@ -27,6 +27,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
             public array $createArgs = [];
             public array $renameArgs = [];
             public array $extendArgs = [];
+            public array $setExpiryArgs = [];
 
             public function __construct()
             {
@@ -58,6 +59,13 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->extendArgs = [$id];
 
                 return ['_id' => $id, 'expiryDate' => '2026-09-28'];
+            }
+
+            public function setExpiry(string $id, \DateTimeImmutable $date): array
+            {
+                $this->setExpiryArgs = [$id, $date->format('Y-m-d')];
+
+                return ['_id' => $id, 'expiryDate' => $date->format('Y-m-d')];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -128,5 +136,21 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
         $this->assertSame(['sub-1'], $this->subscriptions->extendArgs);
         $result->assertJSONFragment(['expiryDate' => '2026-09-28']);
+    }
+
+    public function testSetExpiryPassesValidDateToSubscriptionService(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/subscriptions/sub-1/expiry', ['date' => '2026-09-15']);
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1', '2026-09-15'], $this->subscriptions->setExpiryArgs);
+    }
+
+    public function testSetExpiryRejectsInvalidDate(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/subscriptions/sub-1/expiry', ['date' => '2026-09-31']);
+
+        $result->assertStatus(422);
+        $this->assertSame([], $this->subscriptions->setExpiryArgs);
     }
 }
