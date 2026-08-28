@@ -4,7 +4,7 @@ Depends on: Subscription ledger (`app/Libraries/SubscriptionsService.php`,
 the `subscriptions` Cockpit collection with `token`, `accessUrl`, `status`,
 `expiryDate`, `recipientName` fields).
 
-### Task [1.1]: Recipient config, token lookup & state resolution
+### Task [1.1]: Recipient config, token lookup & state resolution [DONE]
 
 #### Subtasks
 

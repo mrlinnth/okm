@@ -13,6 +13,52 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class SubscriptionsServiceTest extends CIUnitTestCase
 {
+    public function testFindByTokenUsesShortLivedFilteredCockpitLookup(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $arguments = [];
+
+            public function __construct() {}
+
+            public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
+            {
+                $this->arguments = [$model, $params, $ttl];
+
+                return [['_id' => 'sub-1', 'token' => 'recipient-token']];
+            }
+        };
+
+        $subscription = (new SubscriptionsService($cockpit))->findByToken('recipient-token');
+
+        $this->assertSame(['sub-1', 'recipient-token'], [$subscription['_id'], $subscription['token']]);
+        $this->assertSame(['subscriptions', ['filter' => ['token' => 'recipient-token']], 60], $cockpit->arguments);
+    }
+
+    /**
+     * @dataProvider recipientStateCases
+     */
+    public function testResolveRecipientStateHandlesEveryPublicPageState(?array $subscription, string $expected): void
+    {
+        $service = new class extends SubscriptionsService {
+            protected function today(): \DateTimeImmutable { return new \DateTimeImmutable('2026-08-28'); }
+        };
+
+        $this->assertSame($expected, $service->resolveRecipientState($subscription));
+    }
+
+    /**
+     * @return array<string, array{0: array<string, string>|null, 1: string}>
+     */
+    public static function recipientStateCases(): array
+    {
+        return [
+            'unknown token' => [null, 'not_found'],
+            'disabled subscription' => [['status' => 'disabled', 'expiryDate' => '2026-12-01'], 'disabled'],
+            'active past expiry' => [['status' => 'active', 'expiryDate' => '2026-08-27'], 'expired'],
+            'active current expiry' => [['status' => 'active', 'expiryDate' => '2026-08-28'], 'active'],
+        ];
+    }
+
     public function testRenameSyncsActiveKeyBeforeUpdatingCockpit(): void
     {
         $cockpit = new class extends CockpitService {

@@ -51,6 +51,44 @@ class SubscriptionsService
     }
 
     /**
+     * Find a subscription using its public recipient token.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByToken(string $token): ?array
+    {
+        $subscriptions = $this->cockpit->getCollectionCached('subscriptions', [
+            'filter' => ['token' => $token],
+        ], 60);
+
+        return $subscriptions[0] ?? null;
+    }
+
+    /**
+     * Resolve the recipient page state without exposing subscription data for
+     * disabled, expired, or unknown links.
+     *
+     * @param array<string, mixed>|null $subscription
+     */
+    public function resolveRecipientState(?array $subscription): string
+    {
+        if ($subscription === null) {
+            return 'not_found';
+        }
+
+        if (($subscription['status'] ?? null) === 'disabled') {
+            return 'disabled';
+        }
+
+        if (($subscription['status'] ?? null) === 'active'
+            && (string) ($subscription['expiryDate'] ?? '') < $this->today()->format('Y-m-d')) {
+            return 'expired';
+        }
+
+        return 'active';
+    }
+
+    /**
      * Create an active Outline key and its matching Cockpit subscription.
      *
      * @return array<string, mixed>
