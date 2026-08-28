@@ -152,7 +152,19 @@ class Subscriptions extends WebController
 
     public function move(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        $body = $this->request->getJSON(true) ?? [];
+        $destinationServerId = $this->requireString($body, 'destinationServerId');
+        if ($destinationServerId === null) {
+            return $this->errorResponse(422, 'destinationServerId is required.');
+        }
+
+        try {
+            return $this->response->setJSON(Services::subscriptions()->move($id, $destinationServerId));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (OutlineRequestException | \RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     public function delete(string $id): ResponseInterface

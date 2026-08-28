@@ -31,6 +31,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
             public array $enableArgs = [];
             public array $disableArgs = [];
             public array $rerollArgs = [];
+            public array $moveArgs = [];
 
             public function __construct()
             {
@@ -90,6 +91,13 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->rerollArgs = [$id];
 
                 return ['_id' => $id, 'outlineKeyId' => 'new-key', 'accessUrl' => 'ss://new'];
+            }
+
+            public function move(string $id, string $destinationServerId): array
+            {
+                $this->moveArgs = [$id, $destinationServerId];
+
+                return ['_id' => $id, 'serverId' => $destinationServerId];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -203,5 +211,22 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
         $this->assertSame(['sub-1'], $this->subscriptions->rerollArgs);
         $result->assertJSONFragment(['outlineKeyId' => 'new-key']);
+    }
+
+    public function testMovePassesSubscriptionAndDestinationToService(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/subscriptions/sub-1/move', ['destinationServerId' => 'srv-2']);
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1', 'srv-2'], $this->subscriptions->moveArgs);
+        $result->assertJSONFragment(['serverId' => 'srv-2']);
+    }
+
+    public function testMoveRejectsMissingDestinationServer(): void
+    {
+        $result = $this->post('/subscriptions/sub-1/move');
+
+        $result->assertStatus(422);
+        $this->assertSame([], $this->subscriptions->moveArgs);
     }
 }

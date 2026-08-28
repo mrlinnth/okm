@@ -57,7 +57,7 @@ subscription.
 
 ---
 
-### Task [4.3]: Move
+### Task [4.3]: Move [DONE]
 
 #### Subtasks
 

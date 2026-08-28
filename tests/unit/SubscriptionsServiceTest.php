@@ -285,6 +285,52 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         (new SubscriptionsService($cockpit))->reroll('sub-1');
     }
 
+    public function testMoveReplacesKeyOnAValidActiveDestination(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'serverId' => 'source', 'outlineKeyId' => 'old-key', 'keyName' => 'alice-key']; }
+            public function updateItem(string $model, string $id, array $data): ?array { return array_merge(['_id' => $id], $data); }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'source', 'apiUrl' => 'https://source.example/api', 'active' => true], ['_id' => 'destination', 'apiUrl' => 'https://destination.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService {
+            public function __construct() {}
+            public function createKey(string $apiUrl, string $name): array { return ['id' => 'new-key', 'accessUrl' => 'ss://new', 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; }
+            public function deleteKeyById(string $apiUrl, string $id): void {}
+        };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))->move('sub-1', 'destination');
+
+        $this->assertSame('destination', $result['serverId']);
+        $this->assertSame('new-key', $result['outlineKeyId']);
+    }
+
+    /**
+     * @dataProvider invalidMoveDestinations
+     */
+    public function testMoveRejectsAnInvalidDestination(string $destinationServerId, string $message): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'serverId' => 'source']; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'source', 'apiUrl' => 'https://source.example/api', 'active' => true], ['_id' => 'inactive', 'apiUrl' => 'https://inactive.example/api', 'active' => false]]; } };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+        (new SubscriptionsService($cockpit, $servers))->move('sub-1', $destinationServerId);
+    }
+
+    /** @return array<string, array{0: string, 1: string}> */
+    public static function invalidMoveDestinations(): array
+    {
+        return [
+            'same server' => ['source', 'The destination server must differ from the current server.'],
+            'inactive server' => ['inactive', 'The selected server is inactive.'],
+            'missing server' => ['missing', 'The selected server was not found.'],
+        ];
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

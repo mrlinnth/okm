@@ -264,6 +264,23 @@ class SubscriptionsService
     }
 
     /**
+     * Move a subscription to a different active saved server.
+     *
+     * @return array<string, mixed>
+     */
+    public function move(string $id, string $destinationServerId): array
+    {
+        $subscription = $this->findSubscription($id);
+        if ($destinationServerId === (string) $subscription['serverId']) {
+            throw new \InvalidArgumentException('The destination server must differ from the current server.');
+        }
+
+        $this->findActiveServer($destinationServerId);
+
+        return $this->replaceKey($subscription, $destinationServerId);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array

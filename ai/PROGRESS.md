@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 4.3 (Move subscription)
+- **Task**: 4.4 (Delete subscription)
 - **Branch**: feature-subscription-ledger-phase-4
 - **Started**: 2026-08-28
-- **Status**: Implementing Phase 4 move endpoint
+- **Status**: Implementing Phase 4 delete endpoint
 
 ### Notes
 
@@ -38,11 +38,12 @@
   failed cleanup yields a warning while preserving the new active key.
 - Task 4.2 is complete: active subscriptions can reroll to a replacement key;
   disabled and expired subscriptions are rejected.
-- Docker verification passed: focused subscription service/controller tests (30/30).
+- Task 4.3 is complete: moves validate an active, different destination then
+  safely replace the key on that server.
+- Docker verification passed: focused subscription service/controller tests (36/36).
 
 ## Up Next
 
-- 4.3: Move subscription
 - 4.4: Delete subscription
 
 ## Blockers
