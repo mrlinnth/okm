@@ -141,7 +141,13 @@ class Subscriptions extends WebController
 
     public function reroll(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        try {
+            return $this->response->setJSON(Services::subscriptions()->reroll($id));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (OutlineRequestException | \RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     public function move(string $id): ResponseInterface
@@ -152,11 +158,6 @@ class Subscriptions extends WebController
     public function delete(string $id): ResponseInterface
     {
         return $this->stubResponse();
-    }
-
-    private function stubResponse(): ResponseInterface
-    {
-        return $this->response->setJSON(['success' => false]);
     }
 
     /**

@@ -34,7 +34,7 @@ warning; induced cleanup failure returns the new key as recorded plus a
 
 ---
 
-### Task [4.2]: Reroll
+### Task [4.2]: Reroll [DONE]
 
 #### Subtasks
 

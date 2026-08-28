@@ -30,6 +30,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
             public array $setExpiryArgs = [];
             public array $enableArgs = [];
             public array $disableArgs = [];
+            public array $rerollArgs = [];
 
             public function __construct()
             {
@@ -82,6 +83,13 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->disableArgs = [$id];
 
                 return ['_id' => $id, 'status' => 'disabled'];
+            }
+
+            public function reroll(string $id): array
+            {
+                $this->rerollArgs = [$id];
+
+                return ['_id' => $id, 'outlineKeyId' => 'new-key', 'accessUrl' => 'ss://new'];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -186,5 +194,14 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
         $result->assertStatus(200);
         $this->assertSame(['sub-1'], $this->subscriptions->disableArgs);
         $result->assertJSONFragment(['status' => 'disabled']);
+    }
+
+    public function testRerollPassesSubscriptionToService(): void
+    {
+        $result = $this->post('/subscriptions/sub-1/reroll');
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1'], $this->subscriptions->rerollArgs);
+        $result->assertJSONFragment(['outlineKeyId' => 'new-key']);
     }
 }

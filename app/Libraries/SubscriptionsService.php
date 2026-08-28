@@ -249,6 +249,21 @@ class SubscriptionsService
     }
 
     /**
+     * Issue an active subscription a new key on its current server.
+     *
+     * @return array<string, mixed>
+     */
+    public function reroll(string $id): array
+    {
+        $subscription = $this->findSubscription($id);
+        if (($subscription['status'] ?? null) !== 'active') {
+            throw new \InvalidArgumentException('Only active subscriptions can reroll their key.');
+        }
+
+        return $this->replaceKey($subscription, (string) $subscription['serverId']);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array

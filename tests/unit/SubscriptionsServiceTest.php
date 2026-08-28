@@ -253,6 +253,38 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         $this->assertSame('The old Outline key could not be deleted: source unavailable', $result['warning']);
     }
 
+    public function testRerollReplacesAnActiveSubscriptionKeyOnTheSameServer(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'status' => 'active', 'serverId' => 'server', 'outlineKeyId' => 'old-key', 'keyName' => 'alice-key']; }
+            public function updateItem(string $model, string $id, array $data): ?array { return array_merge(['_id' => $id], $data); }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'server', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService {
+            public function __construct() {}
+            public function createKey(string $apiUrl, string $name): array { return ['id' => 'new-key', 'accessUrl' => 'ss://new', 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; }
+            public function deleteKeyById(string $apiUrl, string $id): void {}
+        };
+
+        $result = (new SubscriptionsService($cockpit, $servers, $outline))->reroll('sub-1');
+
+        $this->assertSame('new-key', $result['outlineKeyId']);
+        $this->assertArrayNotHasKey('serverId', $result);
+    }
+
+    public function testRerollRejectsNonActiveSubscription(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'status' => 'disabled']; }
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Only active subscriptions can reroll their key.');
+        (new SubscriptionsService($cockpit))->reroll('sub-1');
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

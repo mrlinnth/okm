@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 4.2 (Reroll)
+- **Task**: 4.3 (Move subscription)
 - **Branch**: feature-subscription-ledger-phase-4
 - **Started**: 2026-08-28
-- **Status**: Implementing Phase 4 reroll endpoint
+- **Status**: Implementing Phase 4 move endpoint
 
 ### Notes
 
@@ -36,11 +36,12 @@
   changing the expiry date.
 - Task 4.1 is complete: replacement keys are saved before old-key cleanup;
   failed cleanup yields a warning while preserving the new active key.
-- Docker verification passed: focused subscription service tests (18/18).
+- Task 4.2 is complete: active subscriptions can reroll to a replacement key;
+  disabled and expired subscriptions are rejected.
+- Docker verification passed: focused subscription service/controller tests (30/30).
 
 ## Up Next
 
-- 4.2: Reroll key
 - 4.3: Move subscription
 - 4.4: Delete subscription
 
