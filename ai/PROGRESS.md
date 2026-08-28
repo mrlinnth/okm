@@ -3,10 +3,10 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 5.1 (Ledger scaffold and filters)
-- **Branch**: feature-subscription-ledger-phase-4
+- **Task**: Complete
+- **Branch**: feature-subscription-ledger-phase-5
 - **Started**: 2026-08-28
-- **Status**: Phase 4 complete; ready to implement Phase 5 ledger UI
+- **Status**: Subscription ledger feature complete
 
 ### Notes
 
@@ -43,10 +43,13 @@
 - Task 4.4 is complete: active subscriptions delete their stable Outline key
   before Cockpit removal; disabled and expired records only remove Cockpit data.
 - Docker verification passed: full PHPUnit suite (109/109).
+- Phase 5 is complete: responsive cached-list ledger, filters, creation and
+  success panel, inline edits/actions, and safe move/delete modals are live.
+- CSS build and full PHPUnit verification passed (109/109).
 
 ## Up Next
 
-- 5.1: Ledger scaffold and filters
+- Subscription ledger is complete.
 
 ## Blockers
 
