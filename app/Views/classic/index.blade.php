@@ -28,7 +28,11 @@
                 <template x-if="current.connected">
                     <div class="mt-2">
                         <div class="flex items-center justify-between">
-                            <p class="text-xs text-base-content/50" x-text="current.label"></p>
+                            <p class="text-xs text-base-content/50">
+                                <span x-text="current.label"></span>
+                                <span class="mx-1">·</span>
+                                <span x-text="current.keys.length + (current.keys.length === 1 ? ' key' : ' keys')"></span>
+                            </p>
                             <button @click="startOverCurrent()" class="link link-hover text-xs text-base-content/50">Start over</button>
                         </div>
 
