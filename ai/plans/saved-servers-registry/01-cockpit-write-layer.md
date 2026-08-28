@@ -57,9 +57,9 @@ after a successful write.
       `OutlineService` (inject via `Services::outline()`, added in
       Classic key manager Phase 1) for the light reachability check; does
       not duplicate any SSRF-safety logic. - `create(string $label, string $serverJson, ?string $publicHost):
-  array` — validates via `parseServerJson`, checks reachability via
+array` — validates via `parseServerJson`, checks reachability via
       `checkReachable`, then calls `Services::cockpit()->createItem
-  ('servers', [...])` with `label`, `serverJson`, the derived
+('servers', [...])` with `label`, `serverJson`, the derived
       `apiUrl`, `publicHost`, and `active = true`. Returns the created
       item or throws on validation/reachability failure — do not create
       the Cockpit item if either check fails. - `setActive(string $id, bool $active): array` — calls
@@ -83,7 +83,7 @@ the reachability check fails.
 
 ---
 
-### Task [1.3]: Controller skeleton and routes
+### Task [1.3]: Controller skeleton and routes [DONE]
 
 #### Subtasks
 
