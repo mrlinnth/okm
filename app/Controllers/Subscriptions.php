@@ -23,9 +23,14 @@ class Subscriptions extends WebController
             static fn (array $server): bool => (bool) ($server['active'] ?? false),
         ));
 
+        $subscriptions = array_map(
+            static fn (array $sub): array => $sub + ['shareLink' => base_url('/s/' . (string) ($sub['token'] ?? ''))],
+            Services::subscriptions()->list(),
+        );
+
         return $this->render('subscriptions.index', [
             'title'         => 'Subscriptions',
-            'subscriptions' => Services::subscriptions()->list(),
+            'subscriptions' => $subscriptions,
             'servers'       => $servers,
         ]);
     }
