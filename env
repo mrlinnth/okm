@@ -29,6 +29,10 @@
 # Shared password for the Saved Servers and Subscriptions admin area.
 # adminaccess.password = 'replace-with-a-long-random-secret'
 
+# Contact links shown in the recipient public page footer.
+# recipient.telegramUsername = 'okm_admin'
+# recipient.viberNumber = '+959000000000'
+
 #--------------------------------------------------------------------
 # DATABASE
 #--------------------------------------------------------------------

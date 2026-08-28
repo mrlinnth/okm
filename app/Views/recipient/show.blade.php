@@ -16,15 +16,20 @@
     <main class="mx-auto flex min-h-[calc(100vh-57px)] w-full max-w-md items-center px-5 py-10">
         <section lang="my" class="w-full rounded-box border border-base-300 bg-base-100 p-6 text-center shadow-xl shadow-base-300/30 sm:p-8">
             @if ($state === 'active' && $subscription !== null)
-                <div x-data="recipientKey({!! json_encode($subscription['accessUrl'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!})">
+                <div x-data="{ copied: false }">
                     <p class="text-sm text-base-content/50">မင်္ဂလာပါ</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight">{{ $subscription['recipientName'] }}</h1>
                     <p class="mt-5 text-sm text-base-content/55">{{ $subscription['expiryDate'] }} အထိ သက်တမ်းရှိသည်</p>
 
                     <div class="mt-4 rounded-box border border-base-300 bg-base-200 px-4 py-3 text-left">
-                        <p class="break-all font-mono text-xs leading-6 text-base-content/75">{{ $subscription['accessUrl'] }}</p>
+                        <p x-ref="key" class="break-all font-mono text-xs leading-6 text-base-content/75">{{ $subscription['accessUrl'] }}</p>
                     </div>
-                    <button @click="copy()" class="btn btn-neutral mt-4 w-full" x-text="copied ? 'ကူးယူပြီးပါပြီ' : 'ကီးကုဒ် ကူးယူရန်'"></button>
+                    <button
+                        type="button"
+                        @click="navigator.clipboard.writeText($refs.key.textContent.trim()); copied = true; setTimeout(() => copied = false, 1500)"
+                        class="btn btn-neutral mt-4 w-full"
+                        x-text="copied ? 'ကူးယူပြီးပါပြီ' : 'ကီးကုဒ် ကူးယူရန်'"
+                    >ကီးကုဒ် ကူးယူရန်</button>
                 </div>
             @else
                 <div class="py-1">
@@ -45,24 +50,11 @@
             <footer class="mt-7 border-t border-base-300 pt-5">
                 <p class="text-xs text-base-content/50">အကူအညီလိုပါသလား? သင့်အက်ဒမင်ကို မက်ဆေ့ချ်ပို့ပါ</p>
                 <div class="mt-3 flex justify-center gap-2">
-                    <a href="https://{{ $recipient->telegramHandle }}" class="btn btn-outline btn-sm">Telegram</a>
+                    <a href="https://t.me/{{ $recipient->telegramUsername }}" class="btn btn-outline btn-sm">Telegram</a>
                     <a href="viber://chat?number={{ urlencode($recipient->viberNumber) }}" class="btn btn-outline btn-sm">Viber</a>
                 </div>
             </footer>
         </section>
     </main>
-
-    <script>
-        function recipientKey(accessUrl) {
-            return {
-                copied: false,
-                async copy() {
-                    await navigator.clipboard.writeText(accessUrl);
-                    this.copied = true;
-                    window.setTimeout(() => { this.copied = false; }, 1500);
-                },
-            };
-        }
-    </script>
 </body>
 </html>
