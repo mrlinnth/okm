@@ -3,7 +3,7 @@
 Depends on: Phase 1 (`diffServer()`, `createFromOutlineKey()`), Phase 3
 (the same auto-import path used by Sync now's no-date case).
 
-### Task [5.1]: `servers:sync` Spark command
+### Task [5.1]: `servers:sync` Spark command [DONE]
 
 #### Subtasks
 

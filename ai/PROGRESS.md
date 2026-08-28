@@ -3,30 +3,37 @@
 ## Current
 
 - **Feature**: key-sync-reconciliation
-- **Task**: 2.1 (Auto-import existing keys when a server is added)
+- **Task**: 6.1 (Unresolved-diff indicator and Sync now modal)
 - **Branch**: feature-key-sync-reconciliation
 - **Started**: 2026-08-28
-- **Status**: Phase 1 (reconciliation core) complete; starting Phase 2 (import)
+- **Status**: Phases 1–5 (all backend) complete; starting Phase 6 (UI)
 
 ### Notes
 
-- Task 1.1: `SavedServersService::diffServer(serverId)` → `{foundOnServer,
-missingOnServer}`. Live keys via `OutlineService::listKeys()`,
-  subscriptions via short-TTL (60s) filtered Cockpit collection. Diff never
-  persisted. New private `findServer()` helper.
-- Task 1.2: `SubscriptionsService::createFromOutlineKey(serverId,
-outlineKey, expiryDate)` — single shared creator for Import / Sync-now
-  import / cron. `recipientName = keyName = key name`, status active,
-  generated token, caller supplies the date (no date math inside).
-- Verification: full suite 145 tests green.
+- Phase 1: `SavedServersService::diffServer()`,
+  `SubscriptionsService::createFromOutlineKey()`.
+- Phase 2: `SubscriptionsService::importAllFromServer()` wired into
+  `Servers::store()`; response carries an `import` summary.
+- Phase 3: `Servers::sync` / `syncImport` / `syncRemove` +
+  `SubscriptionsService::resolveFoundOnServer()` / `removeRecord()` +
+  routes `servers/(:segment)/sync[/import|/remove]`.
+- Phase 4: `SavedServersService::migrate()` (server-level validation, lazy
+  SubscriptionsService accessor to avoid a construction cycle) delegating
+  to `SubscriptionsService::migrateAllToServer()` (create-before-destroy
+  per item, collision suffixing, inactive repoint). `Servers::migrate` +
+  route.
+- Phase 5: `app/Commands/SyncServers.php` → `php spark servers:sync`
+  (crontab note: `10 0 * * *`). NOTE: a smoke-test run of this command on
+  2026-08-28 created 57 real subscription records in live Cockpit
+  (pre-existing key drift) — user chose to keep them, 1-month expiry, will
+  edit manually.
+- Verification: full suite 165 tests green.
 
 ## Up Next
 
-- 2.1: Import on Add Server (`Servers::store()` + `importAllFromServer()`)
-- Phase 3: Sync now endpoints (3.1 diff, 3.2 resolve found, 3.3 resolve missing)
-- Phase 4: Migrate (4.1 logic, 4.2 endpoint)
-- Phase 5: `servers:sync` cron command (5.1)
-- Phase 6: UI (6.1 sync modal + amber dot, 6.2 migrate modal, 6.3 import summary) — manual verification
+- 6.1: Sync now modal + amber unresolved-diff dot (manual verification)
+- 6.2: Migrate modal + results panel (manual verification)
+- 6.3: Add Server success panel import summary (manual verification)
 
 ## Blockers
 
