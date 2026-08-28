@@ -25,6 +25,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
         $this->subscriptions = new class extends SubscriptionsService {
             public int $listCalls = 0;
             public array $createArgs = [];
+            public array $renameArgs = [];
 
             public function __construct()
             {
@@ -42,6 +43,13 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->createArgs = [$recipientName, $keyName, $serverId, $durationMonths, $notes];
 
                 return ['_id' => 'sub-1', 'status' => 'active', 'shareLink' => 'http://localhost/s/token'];
+            }
+
+            public function rename(string $id, ?string $recipientName, ?string $keyName): array
+            {
+                $this->renameArgs = [$id, $recipientName, $keyName];
+
+                return ['_id' => $id, 'recipientName' => $recipientName, 'keyName' => $keyName];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -93,5 +101,15 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 
         $result->assertStatus(422);
         $this->assertSame([], $this->subscriptions->createArgs);
+    }
+
+    public function testUpdatePassesOptionalNamesToSubscriptionService(): void
+    {
+        $result = $this->withBodyFormat('json')->post('/subscriptions/sub-1', [
+            'recipientName' => 'Alice Updated', 'keyName' => 'alice-key-updated',
+        ]);
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1', 'Alice Updated', 'alice-key-updated'], $this->subscriptions->renameArgs);
     }
 }

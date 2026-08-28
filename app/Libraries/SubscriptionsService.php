@@ -91,6 +91,42 @@ class SubscriptionsService
     /**
      * @return array<string, mixed>
      */
+    public function rename(string $id, ?string $recipientName, ?string $keyName): array
+    {
+        $subscription = $this->cockpit->getItemCached('subscriptions', $id);
+        if ($subscription === null) {
+            throw new \InvalidArgumentException('The subscription was not found.');
+        }
+
+        $changes = [];
+        if ($recipientName !== null) {
+            $changes['recipientName'] = $recipientName;
+        }
+
+        if ($keyName !== null) {
+            if (($subscription['status'] ?? null) === 'active') {
+                $server = $this->findActiveServer((string) $subscription['serverId']);
+                $this->outline->renameKey(
+                    (string) $server['apiUrl'],
+                    (string) $subscription['outlineKeyId'],
+                    $keyName,
+                );
+            }
+
+            $changes['keyName'] = $keyName;
+        }
+
+        $updated = $this->cockpit->updateItem('subscriptions', $id, $changes);
+        if ($updated === null) {
+            throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+        }
+
+        return $updated;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function findActiveServer(string $serverId): array
     {
         foreach ($this->savedServers->list() as $server) {

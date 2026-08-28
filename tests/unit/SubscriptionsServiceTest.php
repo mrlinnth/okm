@@ -13,6 +13,33 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class SubscriptionsServiceTest extends CIUnitTestCase
 {
+    public function testRenameSyncsActiveKeyBeforeUpdatingCockpit(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $update = [];
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'status' => 'active', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-1']; }
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService { public array $rename = []; public function __construct() {} public function renameKey(string $apiUrl, string $id, string $name): void { $this->rename = [$apiUrl, $id, $name]; } };
+
+        (new SubscriptionsService($cockpit, $servers, $outline))->rename('sub-1', 'Alice', 'alice-key');
+
+        $this->assertSame(['https://outline.example/api', 'key-1', 'alice-key'], $outline->rename);
+        $this->assertSame(['recipientName' => 'Alice', 'keyName' => 'alice-key'], $cockpit->update);
+    }
+
+    public function testRenameDoesNotTouchOutlineForDisabledSubscription(): void
+    {
+        $cockpit = new class extends CockpitService { public function __construct() {} public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'status' => 'disabled', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-1']; } public function updateItem(string $model, string $id, array $data): ?array { return $data; } };
+        $servers = new class extends SavedServersService { public function __construct() {} };
+        $outline = new class extends OutlineService { public bool $called = false; public function __construct() {} public function renameKey(string $apiUrl, string $id, string $name): void { $this->called = true; } };
+
+        (new SubscriptionsService($cockpit, $servers, $outline))->rename('sub-1', null, 'alice-key');
+
+        $this->assertFalse($outline->called);
+    }
     public function testCreatePersistsActiveSubscriptionAndShareLink(): void
     {
         $cockpit = new class extends CockpitService {

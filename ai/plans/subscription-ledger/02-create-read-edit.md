@@ -55,7 +55,7 @@ link; rejects when the target server is inactive or missing.
 
 ---
 
-### Task [2.3]: Edit recipient / key name
+### Task [2.3]: Edit recipient / key name [DONE]
 
 #### Subtasks
 

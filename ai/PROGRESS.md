@@ -3,7 +3,7 @@
 ## Current
 
 - **Feature**: subscription-ledger
-- **Task**: 2.3 (Edit recipient and key name)
+- **Task**: 3.1 (Extend subscription)
 - **Branch**: feature-subscription-ledger-create-read-edit
 - **Started**: 2026-08-28
 - **Status**: Implementing Phase 2 create, list, and edit endpoints
@@ -25,12 +25,16 @@
   order, and only active saved servers are supplied to the ledger view.
 - Task 2.2 is complete: valid requests create an active Outline key and a
   Cockpit subscription with a month-clamped expiry and recipient share link.
+- Task 2.3 is complete: active key-name changes sync to Outline before
+  Cockpit updates; disabled subscriptions update Cockpit only.
 - Docker verification passed: focused date-helper tests (4/4) and full suite
   (72/72).
 
 ## Up Next
 
-- 2.3: Edit recipient and key name
+- 3.1: Extend subscription
+- 3.2: Inline expiry edit
+- 3.3: Enable and disable
 
 ## Blockers
 

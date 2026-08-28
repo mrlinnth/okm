@@ -74,6 +74,14 @@ class OutlineService
     }
 
     /**
+     * Rename an existing access key by its stable Outline ID.
+     */
+    public function renameKey(string $apiUrl, string $id, string $name): void
+    {
+        $this->request('PUT', $apiUrl, "/access-keys/{$id}/name", ['name' => $name]);
+    }
+
+    /**
      * Deletes a key by name — re-resolves the key's Outline ID from the
      * current server list rather than assuming a cached ID.
      */

@@ -72,7 +72,21 @@ class Subscriptions extends WebController
 
     public function update(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        $body = $this->request->getJSON(true) ?? [];
+        $recipientName = $this->optionalString($body, 'recipientName');
+        $keyName = $this->optionalString($body, 'keyName');
+
+        if ($recipientName === null && $keyName === null) {
+            return $this->errorResponse(422, 'recipientName or keyName is required.');
+        }
+
+        try {
+            return $this->response->setJSON(Services::subscriptions()->rename($id, $recipientName, $keyName));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (OutlineRequestException | \RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     public function extend(string $id): ResponseInterface
@@ -123,6 +137,18 @@ class Subscriptions extends WebController
         $value = $body[$key] ?? null;
 
         return (is_string($value) && $value !== '') ? $value : null;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function optionalString(array $body, string $key): ?string
+    {
+        if (!array_key_exists($key, $body)) {
+            return null;
+        }
+
+        return $this->requireString($body, $key);
     }
 
     private function errorResponse(int $status, string $message): ResponseInterface
