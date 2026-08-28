@@ -26,6 +26,9 @@
 # app.forceGlobalSecureRequests = false
 # app.CSPEnabled = false
 
+# Shared password for the Saved Servers and Subscriptions admin area.
+# adminaccess.password = 'replace-with-a-long-random-secret'
+
 #--------------------------------------------------------------------
 # DATABASE
 #--------------------------------------------------------------------

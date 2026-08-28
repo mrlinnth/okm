@@ -14,21 +14,29 @@ $routes->post('/classic/keys/delete', 'Classic::deleteKey');
 $routes->post('/classic/keys/delete-all', 'Classic::deleteAllKeys');
 $routes->post('/classic/keys/migrate', 'Classic::migrate');
 
-$routes->get('/servers', 'Servers::index');
-$routes->post('/servers', 'Servers::store');
-$routes->post('/servers/(:segment)/activate', 'Servers::activate/$1');
-$routes->post('/servers/(:segment)/deactivate', 'Servers::deactivate/$1');
-$routes->post('/servers/(:segment)/delete', 'Servers::delete/$1');
+$routes->get('/manage', 'AdminAccess::index');
+$routes->post('/manage', 'AdminAccess::authenticate', ['filter' => 'csrf']);
+$routes->post('/manage/logout', 'AdminAccess::logout', ['filter' => ['adminauth', 'csrf']]);
 
-$routes->get('/subscriptions', 'Subscriptions::index');
-$routes->post('/subscriptions', 'Subscriptions::store');
-$routes->post('/subscriptions/(:segment)', 'Subscriptions::update/$1');
-$routes->post('/subscriptions/(:segment)/extend', 'Subscriptions::extend/$1');
-$routes->post('/subscriptions/(:segment)/expiry', 'Subscriptions::setExpiry/$1');
-$routes->post('/subscriptions/(:segment)/enable', 'Subscriptions::enable/$1');
-$routes->post('/subscriptions/(:segment)/disable', 'Subscriptions::disable/$1');
-$routes->post('/subscriptions/(:segment)/reroll', 'Subscriptions::reroll/$1');
-$routes->post('/subscriptions/(:segment)/move', 'Subscriptions::move/$1');
-$routes->post('/subscriptions/(:segment)/delete', 'Subscriptions::delete/$1');
+$routes->group('servers', ['filter' => ['adminauth', 'csrf']], static function (RouteCollection $routes): void {
+    $routes->get('/', 'Servers::index');
+    $routes->post('/', 'Servers::store');
+    $routes->post('(:segment)/activate', 'Servers::activate/$1');
+    $routes->post('(:segment)/deactivate', 'Servers::deactivate/$1');
+    $routes->post('(:segment)/delete', 'Servers::delete/$1');
+});
+
+$routes->group('subscriptions', ['filter' => ['adminauth', 'csrf']], static function (RouteCollection $routes): void {
+    $routes->get('/', 'Subscriptions::index');
+    $routes->post('/', 'Subscriptions::store');
+    $routes->post('(:segment)', 'Subscriptions::update/$1');
+    $routes->post('(:segment)/extend', 'Subscriptions::extend/$1');
+    $routes->post('(:segment)/expiry', 'Subscriptions::setExpiry/$1');
+    $routes->post('(:segment)/enable', 'Subscriptions::enable/$1');
+    $routes->post('(:segment)/disable', 'Subscriptions::disable/$1');
+    $routes->post('(:segment)/reroll', 'Subscriptions::reroll/$1');
+    $routes->post('(:segment)/move', 'Subscriptions::move/$1');
+    $routes->post('(:segment)/delete', 'Subscriptions::delete/$1');
+});
 
 $routes->get('/s/(:any)', 'Recipient::show/$1');

@@ -20,6 +20,18 @@ use CodeIgniter\Config\BaseService;
 class Services extends BaseService
 {
     /**
+     * Shared-password validation and throttling for protected admin tools.
+     */
+    public static function adminAccess(bool $getShared = true): \App\Libraries\AdminAccessService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminAccess');
+        }
+
+        return new \App\Libraries\AdminAccessService(config('AdminAccess'), static::throttler());
+    }
+
+    /**
      * Blade View Service
      *
      * @param bool $getShared

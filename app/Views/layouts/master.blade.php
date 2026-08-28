@@ -8,6 +8,9 @@
     <link href="/css/output.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.16.2/dist/cdn.min.js"></script>
+    @if (session()->get('adminAuthenticated') === true)
+        {!! csrf_meta() !!}
+    @endif
     @stack('styles')
 </head>
 
@@ -17,9 +20,16 @@
             <a href="/" class="btn btn-ghost text-xl font-bold">Outline Key Manager</a>
         </div>
         <div class="flex-none items-center gap-2 hidden md:flex">
+            @if (session()->get('adminAuthenticated') === true)
             <ul class="menu menu-horizontal px-1">
+                <li><a href="/subscriptions">Subscriptions</a></li>
                 <li><a href="/servers">Saved Servers</a></li>
             </ul>
+            <form method="post" action="/manage/logout">
+                {!! csrf_field() !!}
+                <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
+            </form>
+            @endif
             <label class="swap swap-rotate btn btn-ghost btn-circle">
                 <input type="checkbox" id="theme-toggle" />
                 <svg class="swap-off fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -38,7 +48,11 @@
                     </svg>
                 </label>
                 <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-1 p-2 shadow bg-base-100 rounded-box w-52">
+                    @if (session()->get('adminAuthenticated') === true)
+                    <li><a href="/subscriptions">Subscriptions</a></li>
                     <li><a href="/servers">Saved Servers</a></li>
+                    <li><form method="post" action="/manage/logout">{!! csrf_field() !!}<button type="submit">Logout</button></form></li>
+                    @endif
                     <li>
                         <label class="swap swap-rotate">
                             <input type="checkbox" id="theme-toggle-mobile" />

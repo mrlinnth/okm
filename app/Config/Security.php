@@ -15,7 +15,7 @@ class Security extends BaseConfig
      *
      * @var string 'cookie' or 'session'
      */
-    public string $csrfProtection = 'cookie';
+    public string $csrfProtection = 'session';
 
     /**
      * --------------------------------------------------------------------------
@@ -71,7 +71,9 @@ class Security extends BaseConfig
      *
      * Regenerate CSRF Token on every submission.
      */
-    public bool $regenerate = true;
+    // Admin pages make several AJAX requests from one rendered token. Keep the
+    // token stable until expiry so each authenticated action remains valid.
+    public bool $regenerate = false;
 
     /**
      * --------------------------------------------------------------------------

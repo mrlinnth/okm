@@ -97,6 +97,8 @@ final class ServersControllerTest extends CIUnitTestCase
 {
     use FeatureTestTrait;
 
+    private const CSRF_TOKEN = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
     private FakeSavedServers $servers;
     private FakeSubscriptionsForServers $subscriptions;
 
@@ -108,6 +110,8 @@ final class ServersControllerTest extends CIUnitTestCase
         $this->subscriptions = new FakeSubscriptionsForServers();
         Services::injectMock('savedServers', $this->servers);
         Services::injectMock('subscriptions', $this->subscriptions);
+        $this->withSession(['adminAuthenticated' => true, 'csrf_test_name' => self::CSRF_TOKEN]);
+        $this->withHeaders(['X-CSRF-TOKEN' => self::CSRF_TOKEN]);
     }
 
     protected function tearDown(): void

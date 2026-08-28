@@ -15,6 +15,8 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 {
     use FeatureTestTrait;
 
+    private const CSRF_TOKEN = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
     private SubscriptionsService $subscriptions;
     private SavedServersService $servers;
 
@@ -122,6 +124,8 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 
         Services::injectMock('subscriptions', $this->subscriptions);
         Services::injectMock('savedServers', $this->servers);
+        $this->withSession(['adminAuthenticated' => true, 'csrf_test_name' => self::CSRF_TOKEN]);
+        $this->withHeaders(['X-CSRF-TOKEN' => self::CSRF_TOKEN]);
     }
 
     protected function tearDown(): void
@@ -230,7 +234,7 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 
     public function testMoveRejectsMissingDestinationServer(): void
     {
-        $result = $this->post('/subscriptions/sub-1/move');
+        $result = $this->withBodyFormat('json')->post('/subscriptions/sub-1/move', []);
 
         $result->assertStatus(422);
         $this->assertSame([], $this->subscriptions->moveArgs);

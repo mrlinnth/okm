@@ -114,6 +114,11 @@
             deleteError: '',
             deleting: false,
 
+            csrfHeaders() {
+                const token = document.querySelector('meta[name="X-CSRF-TOKEN"]');
+                return token ? { 'X-CSRF-TOKEN': token.content } : {};
+            },
+
             displayHost(srv) {
                 if (srv.publicHost) return srv.publicHost;
                 try {
@@ -158,7 +163,7 @@
                 try {
                     const response = await fetch('/servers', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...this.csrfHeaders() },
                         body: JSON.stringify({
                             label: this.form.label.trim(),
                             serverJson: this.form.json,
@@ -166,6 +171,11 @@
                         }),
                     });
                     const data = await response.json();
+
+                    if (response.status === 401) {
+                        window.location.assign(data.login || '/manage');
+                        return;
+                    }
 
                     if (!response.ok) {
                         // 422 carries the specific reason — invalid JSON vs unreachable.
@@ -186,7 +196,12 @@
                 const action = srv.active ? 'deactivate' : 'activate';
                 srv.busy = true;
                 try {
-                    const response = await fetch(`/servers/${srv.id}/${action}`, { method: 'POST' });
+                    const response = await fetch(`/servers/${srv.id}/${action}`, { method: 'POST', headers: this.csrfHeaders() });
+                    if (response.status === 401) {
+                        const data = await response.json();
+                        window.location.assign(data.login || '/manage');
+                        return;
+                    }
                     if (response.ok) {
                         const updated = await response.json();
                         srv.active = updated.active;
@@ -205,8 +220,12 @@
                 const target = this.deleteTarget;
                 this.deleting = true;
                 try {
-                    const response = await fetch(`/servers/${target.id}/delete`, { method: 'POST' });
+                    const response = await fetch(`/servers/${target.id}/delete`, { method: 'POST', headers: this.csrfHeaders() });
                     const data = await response.json();
+                    if (response.status === 401) {
+                        window.location.assign(data.login || '/manage');
+                        return;
+                    }
                     if (response.ok && data.success) {
                         this.servers = this.servers.filter(s => s.id !== target.id);
                         this.deleteTarget = null;
