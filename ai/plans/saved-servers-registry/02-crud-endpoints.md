@@ -73,7 +73,7 @@ manual cache clearing.
 
 ---
 
-### Task [2.4]: Delete endpoint
+### Task [2.4]: Delete endpoint [DONE]
 
 #### Subtasks
 

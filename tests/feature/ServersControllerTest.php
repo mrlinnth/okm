@@ -219,10 +219,14 @@ final class ServersControllerTest extends CIUnitTestCase
         $this->assertFalse(json_decode($result->getJSON(), true)['active']);
     }
 
-    // --- Task 2.4: delete (stub until implemented) ------------------
+    // --- Task 2.4: delete ------------------------------------------
 
-    public function testDeleteStub(): void
+    public function testDeleteCallsServiceWithIdAndReportsSuccess(): void
     {
-        $this->post('/servers/abc/delete')->assertStatus(200);
+        $result = $this->post('/servers/srv-9/delete');
+
+        $result->assertStatus(200);
+        $this->assertSame(['srv-9'], $this->servers->deleteArgs);
+        $this->assertTrue(json_decode($result->getJSON(), true)['success']);
     }
 }

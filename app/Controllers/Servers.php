@@ -105,7 +105,11 @@ class Servers extends WebController
 
     public function delete(string $id): ResponseInterface
     {
-        return $this->response->setJSON([]);
+        // No subscription-count guard in this feature — nothing can
+        // reference a server yet. Subscription ledger wires that in later.
+        $deleted = Services::savedServers()->delete($id);
+
+        return $this->response->setJSON(['success' => $deleted]);
     }
 
     /**
