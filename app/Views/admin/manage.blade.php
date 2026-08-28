@@ -14,12 +14,12 @@
                 <h1 class="mt-1 text-2xl font-semibold tracking-tight">Manage Subscriptions</h1>
                 <p class="mt-2 text-sm text-base-content/60">Enter the shared admin password to manage subscriptions and saved servers.</p>
 
-                <form method="post" action="/manage" class="mt-5 space-y-4">
+                <form method="post" action="/manage" class="mt-6 flex flex-col gap-4">
                     {!! csrf_field() !!}
-                    <label class="form-control w-full">
-                        <span class="label-text mb-1 text-sm font-medium">Password</span>
-                        <input name="password" type="password" autocomplete="current-password" required autofocus class="input input-bordered w-full" />
-                    </label>
+                    <div class="flex flex-col gap-1.5">
+                        <label for="password" class="text-sm font-medium">Password</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required autofocus class="input input-bordered w-full" />
+                    </div>
                     @if ($error)
                         <p class="text-sm text-error">{{ $error }}</p>
                     @endif

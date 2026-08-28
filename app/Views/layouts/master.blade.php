@@ -29,6 +29,10 @@
                 {!! csrf_field() !!}
                 <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
             </form>
+            @else
+            <ul class="menu menu-horizontal px-1">
+                <li><a href="/manage">Manage</a></li>
+            </ul>
             @endif
             <label class="swap swap-rotate btn btn-ghost btn-circle">
                 <input type="checkbox" id="theme-toggle" />
@@ -52,6 +56,8 @@
                     <li><a href="/subscriptions">Subscriptions</a></li>
                     <li><a href="/servers">Saved Servers</a></li>
                     <li><form method="post" action="/manage/logout">{!! csrf_field() !!}<button type="submit">Logout</button></form></li>
+                    @else
+                    <li><a href="/manage">Manage</a></li>
                     @endif
                     <li>
                         <label class="swap swap-rotate">
