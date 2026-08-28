@@ -119,12 +119,24 @@ class Subscriptions extends WebController
 
     public function enable(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        try {
+            return $this->response->setJSON(Services::subscriptions()->enable($id));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (OutlineRequestException | \RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     public function disable(string $id): ResponseInterface
     {
-        return $this->stubResponse();
+        try {
+            return $this->response->setJSON(Services::subscriptions()->disable($id));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(422, $e->getMessage());
+        } catch (OutlineRequestException | \RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     public function reroll(string $id): ResponseInterface

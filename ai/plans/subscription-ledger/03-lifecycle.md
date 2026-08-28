@@ -50,7 +50,7 @@ past-date request is rejected with 422.
 
 ---
 
-### Task [3.3]: Enable / Disable
+### Task [3.3]: Enable / Disable [DONE]
 
 #### Subtasks
 

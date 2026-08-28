@@ -28,6 +28,8 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
             public array $renameArgs = [];
             public array $extendArgs = [];
             public array $setExpiryArgs = [];
+            public array $enableArgs = [];
+            public array $disableArgs = [];
 
             public function __construct()
             {
@@ -66,6 +68,20 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
                 $this->setExpiryArgs = [$id, $date->format('Y-m-d')];
 
                 return ['_id' => $id, 'expiryDate' => $date->format('Y-m-d')];
+            }
+
+            public function enable(string $id): array
+            {
+                $this->enableArgs = [$id];
+
+                return ['_id' => $id, 'status' => 'active'];
+            }
+
+            public function disable(string $id): array
+            {
+                $this->disableArgs = [$id];
+
+                return ['_id' => $id, 'status' => 'disabled'];
             }
         };
         $this->servers = new class extends SavedServersService {
@@ -152,5 +168,23 @@ final class SubscriptionsControllerTest extends CIUnitTestCase
 
         $result->assertStatus(422);
         $this->assertSame([], $this->subscriptions->setExpiryArgs);
+    }
+
+    public function testEnablePassesSubscriptionToService(): void
+    {
+        $result = $this->post('/subscriptions/sub-1/enable');
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1'], $this->subscriptions->enableArgs);
+        $result->assertJSONFragment(['status' => 'active']);
+    }
+
+    public function testDisablePassesSubscriptionToService(): void
+    {
+        $result = $this->post('/subscriptions/sub-1/disable');
+
+        $result->assertStatus(200);
+        $this->assertSame(['sub-1'], $this->subscriptions->disableArgs);
+        $result->assertJSONFragment(['status' => 'disabled']);
     }
 }

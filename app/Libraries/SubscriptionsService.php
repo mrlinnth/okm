@@ -171,6 +171,49 @@ class SubscriptionsService
     }
 
     /**
+     * Delete an active Outline key and mark its subscription as disabled.
+     *
+     * @return array<string, mixed>
+     */
+    public function disable(string $id): array
+    {
+        $subscription = $this->findSubscription($id);
+        $server = $this->findActiveServer((string) $subscription['serverId']);
+
+        $this->outline->deleteKey((string) $server['apiUrl'], (string) $subscription['keyName']);
+
+        $updated = $this->cockpit->updateItem('subscriptions', $id, ['status' => 'disabled']);
+        if ($updated === null) {
+            throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Create a replacement Outline key and activate its subscription.
+     *
+     * @return array<string, mixed>
+     */
+    public function enable(string $id): array
+    {
+        $subscription = $this->findSubscription($id);
+        $server = $this->findActiveServer((string) $subscription['serverId']);
+        $key = $this->outline->createKey((string) $server['apiUrl'], (string) $subscription['keyName']);
+
+        $updated = $this->cockpit->updateItem('subscriptions', $id, [
+            'outlineKeyId' => $key['id'],
+            'accessUrl'    => $key['accessUrl'],
+            'status'       => 'active',
+        ]);
+        if ($updated === null) {
+            throw new \RuntimeException('Failed to update the subscription in Cockpit.');
+        }
+
+        return $updated;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function findActiveServer(string $serverId): array

@@ -172,6 +172,41 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         $service->setExpiry('sub-1', new \DateTimeImmutable('2026-08-27'));
     }
 
+    public function testDisableDeletesOutlineKeyBeforeMarkingSubscriptionDisabled(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $update = [];
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'serverId' => 'srv-1', 'keyName' => 'alice-key']; }
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService { public array $delete = []; public function __construct() {} public function deleteKey(string $apiUrl, string $name): void { $this->delete = [$apiUrl, $name]; } };
+
+        (new SubscriptionsService($cockpit, $servers, $outline))->disable('sub-1');
+
+        $this->assertSame(['https://outline.example/api', 'alice-key'], $outline->delete);
+        $this->assertSame(['status' => 'disabled'], $cockpit->update);
+    }
+
+    public function testEnableCreatesReplacementKeyAndPreservesExpiryDate(): void
+    {
+        $cockpit = new class extends CockpitService {
+            public array $update = [];
+            public function __construct() {}
+            public function getItemCached(string $model, string $id, ?int $ttl = null): ?array { return ['_id' => $id, 'serverId' => 'srv-1', 'keyName' => 'alice-key', 'outlineKeyId' => 'old-key', 'accessUrl' => 'ss://old', 'status' => 'expired', 'expiryDate' => '2026-01-01']; }
+            public function updateItem(string $model, string $id, array $data): ?array { $this->update = $data; return $data; }
+        };
+        $servers = new class extends SavedServersService { public function __construct() {} public function list(): array { return [['_id' => 'srv-1', 'apiUrl' => 'https://outline.example/api', 'active' => true]]; } };
+        $outline = new class extends OutlineService { public array $create = []; public function __construct() {} public function createKey(string $apiUrl, string $name): array { $this->create = [$apiUrl, $name]; return ['id' => 'new-key', 'accessUrl' => 'ss://new', 'name' => $name, 'bytesUsed' => 0, 'usage' => '0 B']; } };
+
+        (new SubscriptionsService($cockpit, $servers, $outline))->enable('sub-1');
+
+        $this->assertSame(['https://outline.example/api', 'alice-key'], $outline->create);
+        $this->assertSame(['outlineKeyId' => 'new-key', 'accessUrl' => 'ss://new', 'status' => 'active'], $cockpit->update);
+        $this->assertArrayNotHasKey('expiryDate', $cockpit->update);
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];
