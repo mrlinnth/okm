@@ -18,7 +18,7 @@ class SavedServersService
 {
     protected CockpitService $cockpit;
     protected OutlineService $outline;
-    private ?SubscriptionsService $subscriptions;
+    private ?SubscriptionsService $subscriptions = null;
 
     public function __construct(
         ?CockpitService $cockpit = null,
@@ -177,6 +177,64 @@ class SavedServersService
         ));
 
         return ['foundOnServer' => $foundOnServer, 'missingOnServer' => $missingOnServer];
+    }
+
+    /**
+     * Apply a server's reconciliation diff: import every Outline key the
+     * ledger is missing (default 1-month term) and drop every ledger record
+     * whose key is gone. Continues past individual write failures. Shared by
+     * the "Sync now" UI action and the `servers:sync` cron.
+     *
+     * The diff read itself is not wrapped — an unreachable server throws
+     * OutlineRequestException so the caller can report it rather than delete
+     * every record against an empty key list.
+     *
+     * @return array{imported: list<string>, removed: list<string>, failed: int}
+     */
+    public function reconcileServer(string $serverId): array
+    {
+        $diff       = $this->diffServer($serverId);
+        $expiryDate = SubscriptionsService::addMonthsClamped(new \DateTimeImmutable('today'), 1);
+
+        $imported = [];
+        $removed  = [];
+        $failed   = 0;
+
+        foreach ($diff['foundOnServer'] as $key) {
+            try {
+                $this->subscriptions()->createFromOutlineKey($serverId, $key, $expiryDate);
+                $imported[] = (string) ($key['name'] ?? '');
+            } catch (\Throwable $e) {
+                $failed++;
+                log_message('error', 'reconcileServer could not import {name} on {id}: {error}', [
+                    'name'  => (string) ($key['name'] ?? ''),
+                    'id'    => $serverId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        foreach ($diff['missingOnServer'] as $subscription) {
+            $subscriptionId = (string) ($subscription['_id'] ?? '');
+            $label          = (string) ($subscription['recipientName'] ?? $subscription['keyName'] ?? $subscriptionId);
+
+            try {
+                if ($this->subscriptions()->removeRecord($subscriptionId)) {
+                    $removed[] = $label;
+                } else {
+                    $failed++;
+                    log_message('error', 'reconcileServer could not remove stale record {id}', ['id' => $subscriptionId]);
+                }
+            } catch (\Throwable $e) {
+                $failed++;
+                log_message('error', 'reconcileServer could not remove stale record {id}: {error}', [
+                    'id'    => $subscriptionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return ['imported' => $imported, 'removed' => $removed, 'failed' => $failed];
     }
 
     /**

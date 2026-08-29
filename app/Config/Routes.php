@@ -25,13 +25,13 @@ $routes->group('servers', ['filter' => ['adminauth', 'csrf']], static function (
     $routes->post('(:segment)/deactivate', 'Servers::deactivate/$1');
     $routes->post('(:segment)/delete', 'Servers::delete/$1');
     $routes->post('(:segment)/sync', 'Servers::sync/$1');
-    $routes->post('(:segment)/sync/import', 'Servers::syncImport/$1');
-    $routes->post('(:segment)/sync/remove', 'Servers::syncRemove/$1');
+    $routes->post('(:segment)/reconcile', 'Servers::reconcile/$1');
     $routes->post('(:segment)/migrate', 'Servers::migrate/$1');
 });
 
 $routes->group('subscriptions', ['filter' => ['adminauth', 'csrf']], static function (RouteCollection $routes): void {
     $routes->get('/', 'Subscriptions::index');
+    $routes->get('data', 'Subscriptions::data');
     $routes->post('/', 'Subscriptions::store');
     $routes->post('(:segment)', 'Subscriptions::update/$1');
     $routes->post('(:segment)/extend', 'Subscriptions::extend/$1');

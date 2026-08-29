@@ -34,6 +34,14 @@ final class FakeSavedServers extends SavedServersService
 
     public ?\Throwable $diffThrows = null;
 
+    /** @var array<int, string> */
+    public array $reconcileArgs = [];
+
+    /** @var array{imported: list<string>, removed: list<string>, failed: int} */
+    public array $reconcileResult = ['imported' => [], 'removed' => [], 'failed' => 0];
+
+    public ?\Throwable $reconcileThrows = null;
+
     /** @var array<int, array{0: string, 1: string}> */
     public array $migrateArgs = [];
 
@@ -58,6 +66,17 @@ final class FakeSavedServers extends SavedServersService
         }
 
         return $this->diff;
+    }
+
+    public function reconcileServer(string $serverId): array
+    {
+        $this->reconcileArgs[] = $serverId;
+
+        if ($this->reconcileThrows !== null) {
+            throw $this->reconcileThrows;
+        }
+
+        return $this->reconcileResult;
     }
 
     public function migrate(string $sourceId, string $destinationId): array
@@ -139,28 +158,6 @@ final class FakeSubscriptionsForServers extends SubscriptionsService
         return $this->importSummary;
     }
 
-    /** @var array<int, array{0: string, 1: array<int, mixed>, 2: string}> */
-    public array $resolveFoundArgs = [];
-
-    /** @var array<int, mixed> */
-    public array $resolveFoundResults = [];
-
-    /** @var array<int, string> */
-    public array $removeRecordArgs = [];
-
-    public function resolveFoundOnServer(string $serverId, array $keys, string $pastedText): array
-    {
-        $this->resolveFoundArgs[] = [$serverId, $keys, $pastedText];
-
-        return $this->resolveFoundResults;
-    }
-
-    public function removeRecord(string $id): bool
-    {
-        $this->removeRecordArgs[] = $id;
-
-        return true;
-    }
 }
 
 /**
@@ -364,42 +361,31 @@ final class ServersControllerTest extends CIUnitTestCase
         $result->assertStatus(502);
     }
 
-    public function testSyncImportDelegatesKeysAndPastedTextAndReturnsResults(): void
+    public function testReconcileDelegatesToReconcileServerAndReturnsTheSummary(): void
     {
-        $this->subscriptions->resolveFoundResults = [
-            ['name' => 'manual', 'status' => 'resolved', 'expiryDate' => '2026-10-01'],
+        $this->servers->reconcileResult = [
+            'imported' => ['manual-key'],
+            'removed'  => ['Bob'],
+            'failed'   => 0,
         ];
 
-        $result = $this->withBodyFormat('json')->post('/servers/srv-1/sync/import', [
-            'keys'       => [['id' => 'k-x', 'name' => 'manual', 'accessUrl' => 'ss://x']],
-            'pastedText' => "manual: 2026-10-01\n",
-        ]);
+        $result = $this->post('/servers/srv-1/reconcile');
 
         $result->assertStatus(200);
-        [$serverId, $keys, $pasted] = $this->subscriptions->resolveFoundArgs[0];
-        $this->assertSame('srv-1', $serverId);
-        $this->assertSame('manual', $keys[0]['name']);
-        $this->assertSame("manual: 2026-10-01\n", $pasted);
-        $this->assertSame('resolved', json_decode($result->getJSON(), true)['results'][0]['status']);
+        $this->assertSame(['srv-1'], $this->servers->reconcileArgs);
+        $decoded = json_decode($result->getJSON(), true);
+        $this->assertSame(['manual-key'], $decoded['imported']);
+        $this->assertSame(['Bob'], $decoded['removed']);
+        $this->assertSame(0, $decoded['failed']);
     }
 
-    public function testSyncRemoveDeletesTheRecordWithNoOutlineCall(): void
+    public function testReconcileReturns502WhenTheServerCannotBeReached(): void
     {
-        $result = $this->withBodyFormat('json')->post('/servers/srv-1/sync/remove', [
-            'subscriptionId' => 'sub-stale',
-        ]);
+        $this->servers->reconcileThrows = new \App\Libraries\OutlineRequestException('Outline request failed: timeout');
 
-        $result->assertStatus(200);
-        $this->assertSame(['sub-stale'], $this->subscriptions->removeRecordArgs);
-        $this->assertTrue(json_decode($result->getJSON(), true)['success']);
-    }
+        $result = $this->post('/servers/srv-1/reconcile');
 
-    public function testSyncRemoveRejectsAMissingSubscriptionId(): void
-    {
-        $result = $this->withBodyFormat('json')->post('/servers/srv-1/sync/remove', []);
-
-        $result->assertStatus(422);
-        $this->assertSame([], $this->subscriptions->removeRecordArgs);
+        $result->assertStatus(502);
     }
 
     // --- Phase 4: migrate ----------------------------------------

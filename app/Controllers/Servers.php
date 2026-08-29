@@ -135,33 +135,21 @@ class Servers extends WebController
     }
 
     /**
-     * Resolve the "found on server" section: create a subscription per
-     * pasted key, honouring optional `key_name: date` lines.
+     * "Sync now" — apply the reconciliation diff in one step: import every
+     * Outline key the ledger is missing and drop every ledger record whose
+     * key is gone. Same operation the `servers:sync` cron runs.
      */
-    public function syncImport(string $id): ResponseInterface
+    public function reconcile(string $id): ResponseInterface
     {
-        $body = $this->request->getJSON(true) ?? [];
-        $keys = is_array($body['keys'] ?? null) ? $body['keys'] : [];
-        $pastedText = is_string($body['pastedText'] ?? null) ? $body['pastedText'] : '';
-
-        $results = Services::subscriptions()->resolveFoundOnServer($id, $keys, $pastedText);
-
-        return $this->response->setJSON(['results' => $results]);
-    }
-
-    /**
-     * Resolve one "missing on server" row: drop the stale Cockpit record
-     * (its Outline key is already gone).
-     */
-    public function syncRemove(string $id): ResponseInterface
-    {
-        $body = $this->request->getJSON(true) ?? [];
-        $subscriptionId = $this->requireString($body, 'subscriptionId');
-        if ($subscriptionId === null) {
-            return $this->errorResponse(422, 'subscriptionId is required.');
+        try {
+            $summary = Services::savedServers()->reconcileServer($id);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(404, $e->getMessage());
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
         }
 
-        return $this->response->setJSON(['success' => Services::subscriptions()->removeRecord($subscriptionId)]);
+        return $this->response->setJSON($summary);
     }
 
     /**

@@ -278,6 +278,100 @@ final class SavedServersServiceTest extends CIUnitTestCase
         $this->service->diffServer('missing');
     }
 
+    public function testReconcileServerImportsFoundKeysAndRemovesStaleRecords(): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'srv-1', 'apiUrl' => 'https://vpn.example.com/x'],
+        ];
+        $this->cockpit->collections['subscriptions'] = [
+            ['_id' => 'sub-synced', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-synced', 'recipientName' => 'Alice'],
+            ['_id' => 'sub-orphan', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-gone', 'recipientName' => 'Bob'],
+        ];
+        $this->outline->keys = [
+            ['id' => 'key-synced', 'name' => 'alice', 'accessUrl' => 'ss://synced'],
+            ['id' => 'key-extra', 'name' => 'manual-key', 'accessUrl' => 'ss://extra'],
+        ];
+
+        $subscriptions = new class extends SubscriptionsService {
+            /** @var array<int, array{0: string, 1: array<string, mixed>, 2: string}> */
+            public array $created = [];
+
+            /** @var array<int, string> */
+            public array $removed = [];
+
+            public function __construct() {}
+
+            public function createFromOutlineKey(string $serverId, array $outlineKey, \DateTimeImmutable $expiryDate): array
+            {
+                $this->created[] = [$serverId, $outlineKey, $expiryDate->format('Y-m-d')];
+
+                return ['_id' => 'new-sub'];
+            }
+
+            public function removeRecord(string $id): bool
+            {
+                $this->removed[] = $id;
+
+                return true;
+            }
+        };
+        $service = new SavedServersService($this->cockpit, $this->outline, $subscriptions);
+
+        $summary = $service->reconcileServer('srv-1');
+
+        $expectedExpiry = SubscriptionsService::addMonthsClamped(new \DateTimeImmutable('today'), 1)->format('Y-m-d');
+        $this->assertSame([['srv-1', ['id' => 'key-extra', 'name' => 'manual-key', 'accessUrl' => 'ss://extra'], $expectedExpiry]], $subscriptions->created);
+        $this->assertSame(['sub-orphan'], $subscriptions->removed);
+        $this->assertSame(['manual-key'], $summary['imported']);
+        $this->assertSame(['Bob'], $summary['removed']);
+        $this->assertSame(0, $summary['failed']);
+    }
+
+    public function testReconcileServerCountsWriteFailuresWithoutStopping(): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'srv-1', 'apiUrl' => 'https://vpn.example.com/x'],
+        ];
+        $this->cockpit->collections['subscriptions'] = [
+            ['_id' => 'sub-orphan', 'serverId' => 'srv-1', 'outlineKeyId' => 'key-gone', 'recipientName' => 'Bob'],
+        ];
+        $this->outline->keys = [
+            ['id' => 'key-extra', 'name' => 'manual-key', 'accessUrl' => 'ss://extra'],
+        ];
+
+        $subscriptions = new class extends SubscriptionsService {
+            public function __construct() {}
+
+            public function createFromOutlineKey(string $serverId, array $outlineKey, \DateTimeImmutable $expiryDate): array
+            {
+                throw new \RuntimeException('Cockpit write failed.');
+            }
+
+            public function removeRecord(string $id): bool
+            {
+                return false;
+            }
+        };
+        $service = new SavedServersService($this->cockpit, $this->outline, $subscriptions);
+
+        $summary = $service->reconcileServer('srv-1');
+
+        $this->assertSame([], $summary['imported']);
+        $this->assertSame([], $summary['removed']);
+        $this->assertSame(2, $summary['failed']);
+    }
+
+    public function testReconcileServerPropagatesAnUnreachableServer(): void
+    {
+        $this->cockpit->collections['servers'] = [
+            ['_id' => 'srv-1', 'apiUrl' => 'https://vpn.example.com/x'],
+        ];
+        $this->outline->reachable = false;
+
+        $this->expectException(OutlineRequestException::class);
+        $this->service->reconcileServer('srv-1');
+    }
+
     public function testMigrateResolvesTheDestinationAndDelegatesToSubscriptions(): void
     {
         $this->cockpit->collections['servers'] = [

@@ -127,62 +127,43 @@
                 Sync now <span class="text-base-content/50" x-text="syncTarget ? '· ' + syncTarget.label : ''"></span>
             </h3>
 
-            <p x-show="syncLoading" class="mt-4 text-sm text-base-content/60">Comparing live keys against the ledger…</p>
+            <p x-show="syncBusy" class="mt-4 text-sm text-base-content/60">
+                Importing keys created outside the app and dropping records for keys that no longer exist…
+            </p>
             <p x-show="syncError" x-text="syncError" class="mt-4 text-sm text-error"></p>
 
-            <template x-if="syncData && !syncLoading">
-                <div class="mt-4 space-y-5">
-                    <p x-show="syncData.foundOnServer.length === 0 && syncData.missingOnServer.length === 0" class="text-sm text-success">
-                        Everything's in sync.
+            <template x-if="syncSummary && !syncBusy">
+                <div class="mt-4 space-y-4 text-sm">
+                    <p x-show="syncSummary.imported.length === 0 && syncSummary.removed.length === 0 && syncSummary.failed === 0" class="text-success">
+                        Already in sync — nothing to do.
                     </p>
 
-                    {{-- Found on server, not in ledger --}}
-                    <div x-show="syncData.foundOnServer.length > 0">
-                        <p class="text-sm font-medium">Found on server, not in ledger</p>
-                        <ul class="mt-2 space-y-1 text-sm">
-                            <template x-for="key in syncData.foundOnServer" :key="key.id">
-                                <li class="flex items-center justify-between gap-2 rounded border border-base-300 px-2 py-1"
-                                    :class="foundResult[key.name] === 'resolved' ? 'border-success text-success' : ''">
-                                    <span class="truncate font-mono text-xs" x-text="key.name"></span>
-                                    <span x-show="foundResult[key.name] === 'resolved'" class="text-xs">imported</span>
-                                    <span x-show="foundResult[key.name] === 'failed'" class="text-xs text-error">failed</span>
-                                </li>
+                    <div x-show="syncSummary.imported.length > 0">
+                        <p class="font-medium" x-text="'Imported ' + syncSummary.imported.length + ' new ' + (syncSummary.imported.length === 1 ? 'key' : 'keys')"></p>
+                        <ul class="mt-2 space-y-1">
+                            <template x-for="name in syncSummary.imported" :key="name">
+                                <li class="truncate rounded border border-success/40 px-2 py-1 font-mono text-xs text-success" x-text="name || '(unnamed)'"></li>
                             </template>
                         </ul>
-                        <textarea
-                            x-model="pastedText"
-                            rows="3"
-                            placeholder="Optional — one per line:&#10;alice-key: 2026-12-01"
-                            class="textarea mt-2 w-full font-mono text-xs"
-                        ></textarea>
-                        <button @click="resolveFound()" :disabled="syncBusy" class="btn btn-neutral btn-sm mt-2"
-                            x-text="syncBusy ? 'Importing…' : 'Import as subscriptions'"></button>
                     </div>
 
-                    {{-- In ledger, missing on server --}}
-                    <div x-show="syncData.missingOnServer.length > 0">
-                        <p class="text-sm font-medium">In ledger, missing on server</p>
-                        <ul class="mt-2 space-y-1 text-sm">
-                            <template x-for="sub in syncData.missingOnServer" :key="sub._id">
-                                <li class="flex items-center justify-between gap-2 rounded border border-base-300 px-2 py-1"
-                                    :class="missingResult[sub._id] ? 'border-success text-success' : ''">
-                                    <span class="truncate" x-text="sub.recipientName || sub.keyName || sub._id"></span>
-                                    <button
-                                        x-show="!missingResult[sub._id]"
-                                        @click="removeMissing(sub)"
-                                        :disabled="syncBusy"
-                                        class="btn btn-ghost btn-xs"
-                                    >Remove record</button>
-                                    <span x-show="missingResult[sub._id]" class="text-xs">removed</span>
-                                </li>
+                    <div x-show="syncSummary.removed.length > 0">
+                        <p class="font-medium" x-text="'Removed ' + syncSummary.removed.length + ' stale ' + (syncSummary.removed.length === 1 ? 'record' : 'records')"></p>
+                        <ul class="mt-2 space-y-1">
+                            <template x-for="name in syncSummary.removed" :key="name">
+                                <li class="truncate rounded border border-base-300 px-2 py-1 text-xs" x-text="name"></li>
                             </template>
                         </ul>
                     </div>
+
+                    <p x-show="syncSummary.failed > 0" class="text-error"
+                       x-text="syncSummary.failed + ' operation(s) failed — see the server log. Try Sync now again.'"></p>
                 </div>
             </template>
 
             <div class="modal-action">
-                <button @click="closeSync()" class="btn btn-ghost">Close</button>
+                <button @click="openSync(syncTarget)" :disabled="syncBusy" class="btn btn-ghost" x-show="syncSummary && !syncBusy">Run again</button>
+                <button @click="closeSync()" class="btn btn-neutral">Close</button>
             </div>
         </div>
         <div class="modal-backdrop" @click="closeSync()"></div>
@@ -277,13 +258,9 @@
             unresolved: {},
 
             syncTarget: null,
-            syncData: null,
-            syncLoading: false,
+            syncSummary: null,
             syncBusy: false,
             syncError: '',
-            pastedText: '',
-            foundResult: {},
-            missingResult: {},
 
             migrateTarget: null,
             migrateDest: '',
@@ -407,65 +384,34 @@
 
             // --- Sync now ---------------------------------------------
 
+            // One step: import every Outline key the ledger is missing and
+            // drop every ledger record whose key is gone. Same operation the
+            // servers:sync cron runs.
             async openSync(srv) {
                 this.syncTarget = srv;
-                this.syncData = null;
+                this.syncSummary = null;
                 this.syncError = '';
-                this.pastedText = '';
-                this.foundResult = {};
-                this.missingResult = {};
-                this.syncLoading = true;
+                this.syncBusy = true;
                 try {
-                    const response = await this.postJson(`/servers/${srv.id}/sync`);
+                    const response = await this.postJson(`/servers/${srv.id}/reconcile`);
                     if (!response) return;
                     const data = await response.json();
                     if (!response.ok) {
                         this.syncError = data.error || 'Could not reach this server.';
                         return;
                     }
-                    this.syncData = data;
-                    this.unresolved[srv.id] = data.foundOnServer.length + data.missingOnServer.length;
+                    this.syncSummary = data;
+                    this.unresolved[srv.id] = data.failed;
                 } catch (e) {
                     this.syncError = 'Could not reach this server.';
                 } finally {
-                    this.syncLoading = false;
+                    this.syncBusy = false;
                 }
             },
 
             closeSync() {
                 if (this.syncTarget) this.refreshDiff(this.syncTarget.id);
                 this.syncTarget = null;
-            },
-
-            async resolveFound() {
-                const pending = this.syncData.foundOnServer.filter(k => this.foundResult[k.name] !== 'resolved');
-                if (pending.length === 0) return;
-                this.syncBusy = true;
-                try {
-                    const response = await this.postJson(`/servers/${this.syncTarget.id}/sync/import`, {
-                        keys: pending,
-                        pastedText: this.pastedText,
-                    });
-                    if (!response || !response.ok) return;
-                    const data = await response.json();
-                    (data.results || []).forEach(r => { this.foundResult[r.name] = r.status; });
-                } finally {
-                    this.syncBusy = false;
-                }
-            },
-
-            async removeMissing(sub) {
-                this.syncBusy = true;
-                try {
-                    const response = await this.postJson(`/servers/${this.syncTarget.id}/sync/remove`, {
-                        subscriptionId: sub._id,
-                    });
-                    if (!response || !response.ok) return;
-                    const data = await response.json();
-                    if (data.success) this.missingResult[sub._id] = true;
-                } finally {
-                    this.syncBusy = false;
-                }
             },
 
             // --- Migrate --------------------------------------------

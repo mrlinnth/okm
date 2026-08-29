@@ -86,17 +86,18 @@ key through a public tokenised URL with no login and no secret phrase.
 - **Activate / deactivate:** immediate toggle, no confirm.
 - **Delete:** blocked (422) while any subscription references the server —
   deactivate instead.
-- **Sync now:** compares the server's live Outline keys against its ledger
-  records and shows two sections:
-  - _Found on server, not in ledger_ — with an optional textarea for
-    `key_name: date` lines. A matched, valid, today-or-future date is used
-    as the expiry; anything else falls back to `today + 1 month`. Creates
-    one subscription per key; per-key results flip resolved rows green.
-  - _In ledger, missing on server_ — a **Remove record** button per row
-    (deletes only the Cockpit record; the Outline key is already gone).
-  - Shows "Everything's in sync" when both are empty.
+- **Sync now:** one-click reconcile (`POST /servers/{id}/reconcile`,
+  `SavedServersService::reconcileServer()` — the same operation the
+  `servers:sync` cron runs). Imports every live Outline key missing from
+  the ledger as an active subscription (`today + 1 month` term) and deletes
+  every ledger record whose Outline key is gone. Continues past individual
+  write failures. The modal reports the imported key names, the removed
+  record labels, and a failure count; shows "Already in sync" when there
+  was nothing to do. An unreachable server returns 502 and changes nothing
+  (the diff read throws before any write).
   - An amber dot on each server card marks unresolved differences
-    (best-effort check on page load; omitted if the check fails).
+    (best-effort `POST /servers/{id}/sync` diff on page load; omitted if
+    the check fails).
 - **Migrate:** move every subscription on this server (any status) to
   another active server. Active subscriptions get a fresh key on the
   destination (collision-suffixed, tracked within the batch), the record is
@@ -112,6 +113,11 @@ key through a public tokenised URL with no login and no secret phrase.
   notes + 1/2/3-month duration. Creates an Outline key, a Cockpit record,
   and an immutable landing token; a success panel shows the expiry and a
   copyable recipient link. No QR, no secret phrase.
+- **Refresh:** button in the header re-fetches the ledger from
+  `GET /subscriptions/data` (the Alpine component otherwise loads once at
+  render and never re-fetches). The `list()` read is cached for only 60s,
+  so a key added by Sync now, the cron, or a direct Cockpit edit shows up
+  within a minute even without the button.
 - **List:** ordered by expiry. Desktop table / mobile cards. Each row:
   recipient name (click-to-edit), key name (links to the recipient page),
   saved server, status badge (+ "soon" within 7 days), click-to-edit
@@ -144,33 +150,35 @@ key through a public tokenised URL with no login and no secret phrase.
   Outline key, marks the record `expired`. A key that is already gone
   counts as success; a genuine failure leaves the record untouched for the
   next run. Logs failures, prints `Expired: N, Failed: M`.
-- **`php spark servers:sync`** — for every active saved server, runs the
-  same diff as _Sync now_: auto-imports orphan keys (`today + 1 month`
-  term) and auto-removes stale ledger records. Continues past per-server
-  and per-item failures; logs them; prints `Imported / Removed / Failed`.
+- **`php spark servers:sync`** — for every active saved server, runs
+  `SavedServersService::reconcileServer()` (the same operation as the
+  _Sync now_ button): auto-imports orphan keys (`today + 1 month` term) and
+  auto-removes stale ledger records. Continues past per-server and per-item
+  failures; logs them; prints `Imported / Removed / Failed`.
 - Neither command is scheduled by the app. Suggested crontab: `5 0 * * *`
   and `10 0 * * *` respectively.
 
 ## Backend HTTP surface
 
-| Method | Route                                                                   | Filters         | Purpose                    |
-| ------ | ----------------------------------------------------------------------- | --------------- | -------------------------- |
-| GET    | `/`, `/classic`                                                         | —               | Classic Manager page       |
-| POST   | `/classic/keys/{list,create,delete,delete-all,migrate}`                 | —               | Classic key operations     |
-| GET    | `/manage`                                                               | —               | Admin login page           |
-| POST   | `/manage`                                                               | csrf            | Authenticate               |
-| POST   | `/manage/logout`                                                        | adminauth, csrf | Sign out                   |
-| GET    | `/servers`                                                              | adminauth, csrf | Saved Servers page         |
-| POST   | `/servers`                                                              | adminauth, csrf | Add server (+ import)      |
-| POST   | `/servers/{id}/{activate,deactivate,delete}`                            | adminauth, csrf | Server lifecycle           |
-| POST   | `/servers/{id}/sync`                                                    | adminauth, csrf | Reconciliation diff        |
-| POST   | `/servers/{id}/sync/{import,remove}`                                    | adminauth, csrf | Resolve a diff section     |
-| POST   | `/servers/{id}/migrate`                                                 | adminauth, csrf | Bulk migrate subscriptions |
-| GET    | `/subscriptions`                                                        | adminauth, csrf | Subscription ledger page   |
-| POST   | `/subscriptions`                                                        | adminauth, csrf | Create subscription        |
-| POST   | `/subscriptions/{id}`                                                   | adminauth, csrf | Rename recipient / key     |
-| POST   | `/subscriptions/{id}/{extend,expiry,enable,disable,reroll,move,delete}` | adminauth, csrf | Lifecycle operations       |
-| GET    | `/s/{token}`                                                            | —               | Recipient public page      |
+| Method | Route                                                                   | Filters         | Purpose                         |
+| ------ | ----------------------------------------------------------------------- | --------------- | ------------------------------- |
+| GET    | `/`, `/classic`                                                         | —               | Classic Manager page            |
+| POST   | `/classic/keys/{list,create,delete,delete-all,migrate}`                 | —               | Classic key operations          |
+| GET    | `/manage`                                                               | —               | Admin login page                |
+| POST   | `/manage`                                                               | csrf            | Authenticate                    |
+| POST   | `/manage/logout`                                                        | adminauth, csrf | Sign out                        |
+| GET    | `/servers`                                                              | adminauth, csrf | Saved Servers page              |
+| POST   | `/servers`                                                              | adminauth, csrf | Add server (+ import)           |
+| POST   | `/servers/{id}/{activate,deactivate,delete}`                            | adminauth, csrf | Server lifecycle                |
+| POST   | `/servers/{id}/sync`                                                    | adminauth, csrf | Reconciliation diff (amber dot) |
+| POST   | `/servers/{id}/reconcile`                                               | adminauth, csrf | Sync now — apply the diff       |
+| POST   | `/servers/{id}/migrate`                                                 | adminauth, csrf | Bulk migrate subscriptions      |
+| GET    | `/subscriptions`                                                        | adminauth, csrf | Subscription ledger page        |
+| GET    | `/subscriptions/data`                                                   | adminauth, csrf | Ledger JSON (Refresh button)    |
+| POST   | `/subscriptions`                                                        | adminauth, csrf | Create subscription             |
+| POST   | `/subscriptions/{id}`                                                   | adminauth, csrf | Rename recipient / key          |
+| POST   | `/subscriptions/{id}/{extend,expiry,enable,disable,reroll,move,delete}` | adminauth, csrf | Lifecycle operations            |
+| GET    | `/s/{token}`                                                            | —               | Recipient public page           |
 
 ## Security and operational behaviour
 
@@ -189,8 +197,10 @@ key through a public tokenised URL with no login and no secret phrase.
 - **Credential handling:** saved-server `serverJson` is stored in Cockpit
   and stripped from every list/JSON response and rendered page.
 - **Caching:** all Cockpit reads go through `*Cached()` helpers; the
-  reconciliation diff and recipient token lookup use a short (~60s) TTL and
-  are never persisted.
+  subscription ledger list, reconciliation diff, and recipient token lookup
+  use a short (60s) TTL and are never persisted. Subscription writes bust
+  the ledger-list cache immediately; a direct Cockpit edit is picked up
+  within the 60s window.
 
 ## Verification in the repository
 

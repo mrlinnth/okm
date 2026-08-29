@@ -10,9 +10,15 @@
             <h1 class="mt-1 text-2xl font-semibold tracking-tight">Subscriptions</h1>
             <p class="mt-1 text-sm text-base-content/60">Every recipient, key, and renewal in one place.</p>
         </div>
-        <button @click="openCreate()" class="btn btn-neutral btn-sm shrink-0 gap-1.5">
-            <span class="text-lg leading-none">+</span><span class="hidden sm:inline">New subscription</span>
-        </button>
+        <div class="flex shrink-0 gap-2">
+            <button @click="refresh()" :disabled="refreshing" class="btn btn-ghost btn-sm gap-1.5" title="Reload the ledger from Cockpit">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="{ 'animate-spin': refreshing }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" /></svg>
+                <span class="hidden sm:inline" x-text="refreshing ? 'Refreshing…' : 'Refresh'"></span>
+            </button>
+            <button @click="openCreate()" class="btn btn-neutral btn-sm gap-1.5">
+                <span class="text-lg leading-none">+</span><span class="hidden sm:inline">New subscription</span>
+            </button>
+        </div>
     </div>
 
     <div class="mt-6 rounded-box border border-base-300 bg-base-100 p-3 shadow-sm sm:flex sm:items-center sm:gap-3">
@@ -57,7 +63,7 @@
 function subscriptionLedger() {
     return {
         subscriptions: {!! json_encode($subscriptions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}, servers: {!! json_encode($servers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!},
-        filters: { search: '', status: '', serverId: '', expiringSoon: false }, editing: { id: null, field: '', value: '' }, copiedId: null, rerolledId: null, notice: '', showCreate: false, successSub: null, deleteTarget: null, moveTarget: null, moveServerId: '', moveError: '', createError: '', busy: false,
+        filters: { search: '', status: '', serverId: '', expiringSoon: false }, editing: { id: null, field: '', value: '' }, copiedId: null, rerolledId: null, notice: '', showCreate: false, successSub: null, deleteTarget: null, moveTarget: null, moveServerId: '', moveError: '', createError: '', busy: false, refreshing: false,
         editTarget: null, editForm: { recipientName: '', expiryDate: '' }, editError: '',
         createForm: { recipientName: '', keyName: '', serverId: '', duration: 1, notes: '' },
         filtered() { const query = this.filters.search.trim().toLowerCase(); return this.subscriptions.filter(s => (!query || (s.recipientName || '').toLowerCase().includes(query)) && (!this.filters.status || s.status === this.filters.status) && (!this.filters.serverId || s.serverId === this.filters.serverId) && (!this.filters.expiringSoon || this.isSoon(s))); },
@@ -66,6 +72,8 @@ function subscriptionLedger() {
         isSoon(s) { const today = new Date(); today.setHours(0,0,0,0); const due = new Date(s.expiryDate + 'T00:00:00'); const days = Math.round((due - today) / 86400000); return s.status === 'active' && days >= 0 && days <= 7; },
         async post(url, body = {}) { const token = document.querySelector('meta[name="X-CSRF-TOKEN"]'); const headers = { 'Content-Type': 'application/json' }; if (token) headers['X-CSRF-TOKEN'] = token.content; const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }); const data = await response.json(); if (response.status === 401) { window.location.assign(data.login || '/manage'); return; } if (!response.ok) throw new Error(data.error || 'Request failed.'); return data; },
         replace(updated) { const index = this.subscriptions.findIndex(s => s._id === updated._id); if (index >= 0) this.subscriptions.splice(index, 1, { ...this.subscriptions[index], ...updated }); if (updated.warning) this.notice = updated.warning; },
+        async refresh() { this.refreshing = true; try { const response = await fetch('/subscriptions/data', { headers: { 'Accept': 'application/json', ...this.csrfHeaders() } }); if (response.status === 401) { const data = await response.json().catch(() => ({})); window.location.assign(data.login || '/manage'); return; } if (!response.ok) throw new Error('Refresh failed.'); const data = await response.json(); this.subscriptions = data.subscriptions; this.servers = data.servers; } catch (e) { this.notice = e.message; } finally { this.refreshing = false; } },
+        csrfHeaders() { const token = document.querySelector('meta[name="X-CSRF-TOKEN"]'); return token ? { 'X-CSRF-TOKEN': token.content } : {}; },
         copyText(value, id) { navigator.clipboard.writeText(value || ''); this.copiedId = id; setTimeout(() => this.copiedId = null, 1500); }, copyKey(sub) { this.copyText(sub.accessUrl, sub._id); },
         openCreate() { this.createForm = { recipientName: '', keyName: '', serverId: this.servers[0]?._id || '', duration: 1, notes: '' }; this.createError = ''; this.showCreate = true; },
         async create() { this.createError = ''; this.busy = true; try { const created = await this.post('/subscriptions', this.createForm); this.subscriptions.unshift(created); this.showCreate = false; this.successSub = created; } catch (e) { this.createError = e.message; } finally { this.busy = false; } },

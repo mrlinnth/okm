@@ -155,15 +155,31 @@ Public, no login, Myanmar copy. Shows the access key + copy button while active 
 
 Two Spark commands are meant to run from cron (the app does not install them):
 
+- `subscriptions:expire` — deletes the Outline key and marks `expired` for any subscription past `expiryDate + Config\Expiry::$gracePeriodDays` (default 3 days). Retries failures on the next run.
+- `servers:sync` — the same reconcile the _Sync now_ button runs, across every active server: auto-imports orphan Outline keys as subscriptions and auto-removes ledger records whose key is gone.
+
+**Bare-metal / VM** — edit the crontab of the user that owns the app (`crontab -e`):
+
 ```cron
-5  0 * * *  cd /path/to/okm && php spark subscriptions:expire
-10 0 * * *  cd /path/to/okm && php spark servers:sync
+5  0 * * *  cd /path/to/okm && php spark subscriptions:expire >> /var/log/okm-cron.log 2>&1
+10 0 * * *  cd /path/to/okm && php spark servers:sync        >> /var/log/okm-cron.log 2>&1
 ```
 
-- `subscriptions:expire` — deletes the Outline key and marks `expired` for any subscription past `expiryDate + Config\Expiry::$gracePeriodDays` (default 3 days). Retries failures on the next run.
-- `servers:sync` — runs the _Sync now_ diff across every active server, auto-importing orphan keys and auto-removing stale records.
+**Docker Compose** — the `cli` container is always up (`command: tail -f /dev/null`), so run the commands in it from the **host's** crontab:
 
-Run in Docker with `docker compose exec cli php spark <command>`.
+```cron
+5  0 * * *  cd /path/to/okm && docker compose exec -T cli php spark subscriptions:expire >> /var/log/okm-cron.log 2>&1
+10 0 * * *  cd /path/to/okm && docker compose exec -T cli php spark servers:sync        >> /var/log/okm-cron.log 2>&1
+```
+
+`-T` disables TTY allocation (required from cron). Verify a command works before scheduling it:
+
+```bash
+docker compose exec cli php spark servers:sync
+# → Imported: 0, Removed: 0, Failed: 0
+```
+
+Both jobs are idempotent and log failures to CI4's log (`writable/logs/`), so a missed run is harmless — the next run catches up.
 
 ## Available Services
 

@@ -18,6 +18,25 @@ class Subscriptions extends WebController
 {
     public function index(): string
     {
+        return $this->render('subscriptions.index', [
+            'title' => 'Subscriptions',
+        ] + $this->presentLedger());
+    }
+
+    /**
+     * JSON snapshot of the ledger for the page's "Refresh" button — the
+     * Alpine component loads once at render and never re-fetches on its own.
+     */
+    public function data(): ResponseInterface
+    {
+        return $this->response->setJSON($this->presentLedger());
+    }
+
+    /**
+     * @return array{subscriptions: array<int, array<string, mixed>>, servers: array<int, array<string, mixed>>}
+     */
+    private function presentLedger(): array
+    {
         $servers = array_values(array_filter(
             Services::savedServers()->list(),
             static fn (array $server): bool => (bool) ($server['active'] ?? false),
@@ -28,11 +47,7 @@ class Subscriptions extends WebController
             Services::subscriptions()->list(),
         );
 
-        return $this->render('subscriptions.index', [
-            'title'         => 'Subscriptions',
-            'subscriptions' => $subscriptions,
-            'servers'       => $servers,
-        ]);
+        return ['subscriptions' => $subscriptions, 'servers' => $servers];
     }
 
     public function store(): ResponseInterface
