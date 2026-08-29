@@ -35,6 +35,15 @@
         </label>
     </div>
 
+    <div class="mt-3 flex items-center justify-between gap-3 px-1 text-sm text-base-content/60">
+        <span>
+            <span class="font-semibold text-base-content" x-text="filtered().length"></span>
+            <span x-text="filtered().length === 1 ? 'key' : 'keys'"></span>
+            <span x-show="filtered().length !== subscriptions.length" x-text="'of ' + subscriptions.length + ' shown'"></span>
+        </span>
+        <button x-show="hasFilters()" @click="clearFilters()" class="btn btn-ghost btn-xs">Clear filters</button>
+    </div>
+
     <template x-if="notice"><div class="alert alert-warning mt-4 text-sm"><span x-text="notice"></span><button @click="notice = ''" class="btn btn-ghost btn-xs">Dismiss</button></div></template>
 
     <div class="mt-5 hidden overflow-visible rounded-box border border-base-300 bg-base-100 lg:block">
@@ -67,6 +76,8 @@ function subscriptionLedger() {
         editTarget: null, editForm: { recipientName: '', expiryDate: '' }, editError: '',
         createForm: { recipientName: '', keyName: '', serverId: '', duration: 1, notes: '' },
         filtered() { const query = this.filters.search.trim().toLowerCase(); return this.subscriptions.filter(s => (!query || (s.recipientName || '').toLowerCase().includes(query)) && (!this.filters.status || s.status === this.filters.status) && (!this.filters.serverId || s.serverId === this.filters.serverId) && (!this.filters.expiringSoon || this.isSoon(s))); },
+        hasFilters() { return this.filters.search.trim() !== '' || this.filters.status !== '' || this.filters.serverId !== '' || this.filters.expiringSoon; },
+        clearFilters() { this.filters = { search: '', status: '', serverId: '', expiringSoon: false }; },
         formatDate(value) { return value ? new Date(value + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'; },
         serverLabel(id) { return this.servers.find(s => s._id === id)?.label || 'Unknown server'; }, statusClass(status) { return { active: 'badge-success', disabled: 'badge-ghost', expired: 'badge-error' }[status] || 'badge-ghost'; },
         isSoon(s) { const today = new Date(); today.setHours(0,0,0,0); const due = new Date(s.expiryDate + 'T00:00:00'); const days = Math.round((due - today) / 86400000); return s.status === 'active' && days >= 0 && days <= 7; },
