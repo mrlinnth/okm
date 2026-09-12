@@ -136,10 +136,13 @@ class CockpitService
         // Fetch from API
         $data = $this->getCollection($model, $params);
 
-        // Cache the result
-        $this->cache->save($cacheKey, $data, $ttl);
+        // A failed read is not an empty collection. Do not cache it: a
+        // transient Cockpit/VPN outage must not hide records for the TTL.
+        if ($data !== null) {
+            $this->cache->save($cacheKey, $data, $ttl);
+        }
 
-        return $data;
+        return $data ?? [];
     }
 
     /**
@@ -249,44 +252,15 @@ class CockpitService
      *
      * @param string $model Name of the collection model
      * @param array $params Optional query parameters
-     * @return array
+     * @return array|null Null when the read failed; [] is a valid empty list.
      */
-    protected function getCollection(string $model, array $params = []): array
+    protected function getCollection(string $model, array $params = []): ?array
     {
         try {
-            $url = "{$this->apiUrl}/api/content/items/$model";
-
-            $options = [];
-            if (!empty($params)) {
-                // Cockpit API expects filter and sort as URL-encoded JSON strings
-                if (isset($params['filter']) && is_array($params['filter'])) {
-                    $params['filter'] = json_encode($params['filter']);
-                }
-                if (isset($params['sort']) && is_array($params['sort'])) {
-                    $params['sort'] = json_encode($params['sort']);
-                }
-                $options['query'] = $params;
-            }
-
-            $response = $this->client->get($url, $options);
-
-            if ($response->getStatusCode() === 200) {
-                $body = $response->getBody();
-                $result = json_decode($body, true);
-
-                // The Content API returns the data directly or in an 'entries' key
-                if (isset($result['entries'])) {
-                    return $result['entries'];
-                }
-
-                return is_array($result) ? $result : [];
-            }
-
-            log_message('error', "Cockpit API error for collection model '{$model}': " . $response->getStatusCode());
-            return [];
-        } catch (\Exception $e) {
+            return $this->getCollectionFresh($model, $params);
+        } catch (\RuntimeException $e) {
             log_message('error', "Cockpit API exception for collection model '{$model}': " . $e->getMessage());
-            return [];
+            return null;
         }
     }
 

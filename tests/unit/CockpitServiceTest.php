@@ -17,6 +17,17 @@ final class TestableCockpitService extends CockpitService
     /** @var array<int, string> */
     public array $clearedCaches = [];
 
+    /** @var array<int, array<int, array<string, mixed>>|null> */
+    public array $collectionResponses = [];
+
+    public int $collectionReads = 0;
+
+    protected function getCollection(string $model, array $params = []): ?array
+    {
+        $this->collectionReads++;
+        return array_shift($this->collectionResponses);
+    }
+
     protected function sendWrite(string $method, string $url, ?array $body = null): array
     {
         $this->capturedWrites[] = ['method' => $method, 'url' => $url, 'body' => $body];
@@ -44,6 +55,19 @@ final class TestableCockpitService extends CockpitService
  */
 final class CockpitServiceTest extends CIUnitTestCase
 {
+    public function testFailedCollectionReadIsNotCachedButEmptySuccessIs(): void
+    {
+        $service = new TestableCockpitService();
+        $model = 'read-retry-' . bin2hex(random_bytes(4));
+        $service->collectionResponses = [null, [], [['_id' => 'server-1']]];
+
+        $this->assertSame([], $service->getCollectionCached($model));
+        $this->assertSame([], $service->getCollectionCached($model));
+        $this->assertSame(2, $service->collectionReads);
+        $this->assertSame([], $service->getCollectionCached($model));
+        $this->assertSame(2, $service->collectionReads);
+    }
+
     public function testCreateItemPostsWrappedDataAndClearsCollectionCache(): void
     {
         $service = new TestableCockpitService();
