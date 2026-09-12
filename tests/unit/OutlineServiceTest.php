@@ -79,6 +79,19 @@ final class OutlineServiceTest extends CIUnitTestCase
         $this->assertFalse($service->capturedCurlOptions[CURLOPT_SSL_VERIFYPEER]);
     }
 
+    public function testDelete404MarksKeyAsAlreadyMissing(): void
+    {
+        $service = new TestableOutlineService();
+        $service->fakeResponse = ['status' => 404, 'body' => '', 'error' => null];
+
+        try {
+            $service->deleteKeyById('https://203.0.113.10:8443', 'missing');
+            $this->fail('Expected a missing-key response.');
+        } catch (OutlineRequestException $e) {
+            $this->assertTrue($e->isNotFound());
+        }
+    }
+
     public function testListKeysMergesAccessKeysWithTransferUsage(): void
     {
         $service = new TestableOutlineService();

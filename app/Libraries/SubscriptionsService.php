@@ -541,11 +541,25 @@ class SubscriptionsService
      */
     public function delete(string $id): void
     {
-        $subscription = $this->findSubscription($id);
+        $this->deleteFromRecord($this->findSubscription($id));
+    }
 
+    /** @param array<string, mixed> $subscription */
+    public function deleteFromRecord(array $subscription): void
+    {
+        $id = (string) ($subscription['_id'] ?? '');
+        if ($id === '') {
+            throw new \InvalidArgumentException('The subscription has no ID.');
+        }
         if (($subscription['status'] ?? null) === 'active') {
-            $server = $this->findActiveServer((string) $subscription['serverId']);
-            $this->outline->deleteKeyById((string) $server['apiUrl'], (string) $subscription['outlineKeyId']);
+            $server = $this->findServerById((string) $subscription['serverId']);
+            try {
+                $this->outline->deleteKeyById((string) $server['apiUrl'], (string) $subscription['outlineKeyId']);
+            } catch (OutlineRequestException $e) {
+                if (!$e->isNotFound()) {
+                    throw $e;
+                }
+            }
         }
 
         if (!$this->cockpit->deleteItem('subscriptions', $id)) {

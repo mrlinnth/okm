@@ -143,6 +143,50 @@ class CockpitService
     }
 
     /**
+     * Read a collection without cache and fail closed on Cockpit errors.
+     * Destructive workflows must not mistake a failed read for an empty list.
+     *
+     * @param array<string, mixed> $params
+     * @return array<int, array<string, mixed>>
+     */
+    public function getCollectionFresh(string $model, array $params = []): array
+    {
+        $options = [];
+        if ($params !== []) {
+            foreach (['filter', 'sort'] as $key) {
+                if (isset($params[$key]) && is_array($params[$key])) {
+                    $params[$key] = json_encode($params[$key]);
+                }
+            }
+            $options['query'] = $params;
+        }
+
+        try {
+            $response = $this->client->get("{$this->apiUrl}/api/content/items/{$model}", $options);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to read {$model} from Cockpit.", 0, $e);
+        }
+
+        if ($response->getStatusCode() !== 200) {
+            throw new \RuntimeException("Failed to read {$model} from Cockpit (HTTP {$response->getStatusCode()}).");
+        }
+
+        $decoded = json_decode($response->getBody(), true);
+        $items = is_array($decoded) && isset($decoded['entries']) ? $decoded['entries'] : $decoded;
+        if (!is_array($items) || !array_is_list($items)) {
+            throw new \RuntimeException("Cockpit returned an invalid {$model} list.");
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                throw new \RuntimeException("Cockpit returned an invalid {$model} item.");
+            }
+        }
+
+        return $items;
+    }
+
+    /**
      * Get a specific item from a collection by ID (cached)
      *
      * @param string $model Name of the collection model

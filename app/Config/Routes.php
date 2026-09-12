@@ -23,6 +23,8 @@ $routes->group('servers', ['filter' => ['adminauth', 'csrf']], static function (
     $routes->post('/', 'Servers::store');
     $routes->post('(:segment)/activate', 'Servers::activate/$1');
     $routes->post('(:segment)/deactivate', 'Servers::deactivate/$1');
+    $routes->get('(:segment)/delete-preview', 'Servers::deletePreview/$1');
+    $routes->post('(:segment)/subscriptions/(:segment)/delete', 'Servers::deleteSubscription/$1/$2');
     $routes->post('(:segment)/delete', 'Servers::delete/$1');
     $routes->post('(:segment)/sync', 'Servers::sync/$1');
     $routes->post('(:segment)/reconcile', 'Servers::reconcile/$1');

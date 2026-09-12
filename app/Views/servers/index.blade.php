@@ -232,14 +232,26 @@
     <div x-cloak class="modal" :class="{ 'modal-open': deleteTarget }">
         <div class="modal-box max-w-sm">
             <h3 class="font-semibold">Delete saved server?</h3>
-            <p class="mt-1 text-sm text-base-content/60" x-text="deleteTarget ? 'This removes ' + deleteTarget.label + ' from the registry.' : ''"></p>
+            <p class="mt-1 text-sm text-base-content/60" x-text="deleteTarget ? 'Delete ' + deleteTarget.label + ' and all of its subscriptions?' : ''"></p>
+            <p x-show="deleteLoading" class="mt-3 text-sm">Loading subscription count…</p>
+            <template x-if="deletePreview">
+                <div class="mt-3 space-y-2 text-sm">
+                    <p><strong x-text="deletePreview.total"></strong> subscriptions will be removed, including <strong x-text="deletePreview.active"></strong> active subscriptions. Their recipient links will stop working.</p>
+                    <p x-show="!deleteNeedsForce" class="text-base-content/60">OKM will try to revoke active Outline keys before removing their records.</p>
+                    <p x-show="deleteNeedsForce" class="text-error">Outline revocation failed. Removing the remaining records without revoking their keys may leave keys live if the server recovers.</p>
+                    <p x-show="deleteProgress.total > 0" class="text-base-content/60" x-text="deleteProgress.done + ' of ' + deleteProgress.total + ' processed'"></p>
+                </div>
+            </template>
             <p x-show="deleteError" x-text="deleteError" class="mt-2 text-xs text-error"></p>
-            <div class="modal-action">
-                <button @click="deleteTarget = null" class="btn btn-ghost flex-1">Cancel</button>
-                <button @click="confirmDelete()" :disabled="deleting" class="btn btn-error flex-1" x-text="deleting ? 'Deleting…' : 'Delete'"></button>
+            <div class="modal-action flex-col">
+                <div class="flex w-full gap-2">
+                    <button @click="closeDelete()" :disabled="deleting" class="btn btn-ghost flex-1">Cancel</button>
+                    <button @click="confirmDelete(false)" :disabled="deleting || deleteLoading || !deletePreview" class="btn btn-error flex-1" x-text="deleting ? 'Deleting…' : (deleteNeedsForce ? 'Retry' : 'Delete')"></button>
+                </div>
+                <button x-show="deleteNeedsForce" @click="confirmDelete(true)" :disabled="deleting || deleteLoading || !deletePreview" class="btn btn-error w-full">Remove records anyway</button>
             </div>
         </div>
-        <div class="modal-backdrop" @click="deleteTarget = null"></div>
+        <div class="modal-backdrop" @click="closeDelete()"></div>
     </div>
 
 </div>
@@ -269,6 +281,10 @@
             migrateResults: null,
 
             deleteTarget: null,
+            deletePreview: null,
+            deleteLoading: false,
+            deleteNeedsForce: false,
+            deleteProgress: { done: 0, total: 0 },
             deleteError: '',
             deleting: false,
 
@@ -293,6 +309,27 @@
                     return null;
                 }
                 return response;
+            },
+
+            async readJson(response) {
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    const error = new Error(`Request failed (HTTP ${response.status}).`);
+                    error.status = response.status;
+                    throw error;
+                }
+                if (!data || typeof data !== 'object') {
+                    throw new Error('The server returned an invalid response.');
+                }
+                if (!response.ok) {
+                    const error = new Error(data.error || `Request failed (HTTP ${response.status}).`);
+                    error.status = response.status;
+                    error.kind = data.kind || null;
+                    throw error;
+                }
+                return data;
             },
 
             displayHost(srv) {
@@ -476,26 +513,78 @@
                 }
             },
 
-            askDelete(srv) {
+            async askDelete(srv) {
                 this.deleteError = '';
                 this.deleteTarget = srv;
+                this.deleteNeedsForce = false;
+                this.deleteProgress = { done: 0, total: 0 };
+                await this.loadDeletePreview();
             },
 
-            async confirmDelete() {
-                const target = this.deleteTarget;
-                this.deleting = true;
+            closeDelete() {
+                if (this.deleting) return;
+                this.deleteTarget = null;
+                this.deletePreview = null;
+                this.deleteNeedsForce = false;
+            },
+
+            async loadDeletePreview() {
+                if (!this.deleteTarget) return false;
+                const serverId = this.deleteTarget.id;
+                this.deleteLoading = true;
+                this.deletePreview = null;
                 try {
+                    const response = await fetch(`/servers/${serverId}/delete-preview`, { headers: { 'Accept': 'application/json', ...this.csrfHeaders() } });
+                    if (response.status === 401) {
+                        const data = await response.json().catch(() => ({}));
+                        window.location.assign(data.login || '/manage');
+                        return false;
+                    }
+                    const snapshot = await this.readJson(response);
+                    if (this.deleteTarget?.id !== serverId) return false;
+                    this.deletePreview = snapshot;
+                    return true;
+                } catch (e) {
+                    if (this.deleteTarget?.id === serverId) this.deleteError = e.message;
+                    return false;
+                } finally {
+                    this.deleteLoading = false;
+                }
+            },
+
+            async confirmDelete(recordsOnly) {
+                if (!this.deleteTarget || !this.deletePreview || (recordsOnly && !this.deleteNeedsForce)) return;
+                const target = this.deleteTarget;
+                const snapshot = this.deletePreview.subscriptions;
+                this.deleting = true;
+                this.deleteError = '';
+                this.deleteProgress = { done: 0, total: snapshot.length };
+                let currentSub = null;
+                try {
+                    for (const sub of snapshot) {
+                        currentSub = sub;
+                        const response = await this.postJson(`/servers/${target.id}/subscriptions/${sub.id}/delete`, { mode: recordsOnly ? 'records-only' : 'revoke' });
+                        if (!response) return;
+                        await this.readJson(response);
+                        this.deleteProgress.done++;
+                    }
+
+                    currentSub = null;
                     const response = await this.postJson(`/servers/${target.id}/delete`);
                     if (!response) return;
-                    const data = await response.json();
-                    if (response.ok && data.success) {
-                        this.servers = this.servers.filter(s => s.id !== target.id);
-                        this.deleteTarget = null;
-                    } else {
-                        this.deleteError = data.error || 'Failed to delete server.';
-                    }
+                    await this.readJson(response);
+                    this.servers = this.servers.filter(s => s.id !== target.id);
+                    delete this.unresolved[target.id];
+                    this.deleteTarget = null;
+                    this.deletePreview = null;
+                    this.deleteNeedsForce = false;
                 } catch (e) {
-                    this.deleteError = 'Failed to delete server.';
+                    const failure = e;
+                    const refreshed = await this.loadDeletePreview();
+                    if (refreshed) {
+                        this.deleteError = failure.message;
+                        this.deleteNeedsForce = !recordsOnly && currentSub?.status === 'active' && this.deletePreview.active > 0 && (failure.kind === 'outline' || (failure.status === 502 && !failure.kind));
+                    }
                 } finally {
                     this.deleting = false;
                 }

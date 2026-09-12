@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Libraries\InvalidServerJsonException;
+use App\Libraries\OutlineRequestException;
 use App\Libraries\ServerUnreachableException;
 use App\Libraries\SubscriptionsService;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -173,19 +174,46 @@ class Servers extends WebController
         return $this->response->setJSON($result);
     }
 
-    public function delete(string $id): ResponseInterface
+    public function deletePreview(string $id): ResponseInterface
     {
-        $subscriptionCount = Services::subscriptions()->countByServer($id);
-        if ($subscriptionCount > 0) {
-            return $this->errorResponse(
-                422,
-                "Cannot delete a server with {$subscriptionCount} active subscriptions — deactivate it instead.",
-            );
+        try {
+            return $this->response->setJSON(Services::savedServers()->deletePreview($id));
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(404, $e->getMessage());
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
+    }
+
+    public function deleteSubscription(string $id, string $subscriptionId): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+        $mode = $body['mode'] ?? null;
+        if ($mode !== 'revoke' && $mode !== 'records-only') {
+            return $this->errorResponse(422, 'A valid deletion mode is required.');
         }
 
-        $deleted = Services::savedServers()->delete($id);
+        try {
+            $deleted = Services::savedServers()->deleteSubscriptionForServer($id, $subscriptionId, $mode === 'records-only');
+            return $this->response->setJSON(['success' => true, 'deleted' => $deleted]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(404, $e->getMessage());
+        } catch (OutlineRequestException $e) {
+            return $this->response->setStatusCode(502)->setJSON(['error' => $e->getMessage(), 'kind' => 'outline']);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(502)->setJSON(['error' => $e->getMessage(), 'kind' => 'cockpit']);
+        }
+    }
 
-        return $this->response->setJSON(['success' => $deleted]);
+    public function delete(string $id): ResponseInterface
+    {
+        try {
+            return $this->response->setJSON(['success' => Services::savedServers()->deleteWhenEmpty($id)]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse(409, $e->getMessage());
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse(502, $e->getMessage());
+        }
     }
 
     /**

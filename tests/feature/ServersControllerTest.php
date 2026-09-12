@@ -27,6 +27,14 @@ final class FakeSavedServers extends SavedServersService
     /** @var array<int, string> */
     public array $deleteArgs = [];
 
+    /** @var array{total: int, active: int, subscriptions: array<int, array{id: string, status: string}>} */
+    public array $deleteSnapshot = ['total' => 0, 'active' => 0, 'subscriptions' => []];
+
+    /** @var array<int, array{0: string, 1: string, 2: bool}> */
+    public array $deleteSubscriptionArgs = [];
+
+    public ?\Throwable $deleteThrows = null;
+
     public ?\Throwable $createThrows = null;
 
     /** @var array{foundOnServer: array<int, mixed>, missingOnServer: array<int, mixed>} */
@@ -126,6 +134,34 @@ final class FakeSavedServers extends SavedServersService
         $this->deleteArgs[] = $id;
 
         return true;
+    }
+
+    public function deletePreview(string $id): array
+    {
+        if ($this->deleteThrows !== null) {
+            throw $this->deleteThrows;
+        }
+        return $this->deleteSnapshot;
+    }
+
+    public function deleteSubscriptionForServer(string $serverId, string $subscriptionId, bool $recordsOnly): bool
+    {
+        $this->deleteSubscriptionArgs[] = [$serverId, $subscriptionId, $recordsOnly];
+        if ($this->deleteThrows !== null) {
+            throw $this->deleteThrows;
+        }
+        return true;
+    }
+
+    public function deleteWhenEmpty(string $id): bool
+    {
+        if ($this->deleteThrows !== null) {
+            throw $this->deleteThrows;
+        }
+        if ($this->deleteSnapshot['total'] > 0) {
+            throw new \InvalidArgumentException('Subscriptions still reference this server.');
+        }
+        return $this->delete($id);
     }
 }
 
@@ -445,12 +481,49 @@ final class ServersControllerTest extends CIUnitTestCase
 
     public function testDeleteRejectsServerWithSubscriptionsWithoutCallingDelete(): void
     {
-        $this->subscriptions->count = 2;
+        $this->servers->deleteSnapshot = ['total' => 2, 'active' => 1, 'subscriptions' => [
+            ['id' => 'sub-1', 'status' => 'active'],
+            ['id' => 'sub-2', 'status' => 'expired'],
+        ]];
 
         $result = $this->post('/servers/srv-9/delete');
 
-        $result->assertStatus(422);
-        $result->assertJSONFragment(['error' => 'Cannot delete a server with 2 active subscriptions — deactivate it instead.']);
+        $result->assertStatus(409);
+        $result->assertJSONFragment(['error' => 'Subscriptions still reference this server.']);
         $this->assertSame([], $this->servers->deleteArgs);
+    }
+
+    public function testDeletePreviewShowsTotalAndActiveCounts(): void
+    {
+        $this->servers->deleteSnapshot = ['total' => 2, 'active' => 1, 'subscriptions' => [
+            ['id' => 'sub-1', 'status' => 'active'],
+            ['id' => 'sub-2', 'status' => 'expired'],
+        ]];
+
+        $this->get('/servers/srv-9/delete-preview')->assertJSONFragment(['total' => 2, 'active' => 1]);
+    }
+
+    public function testServerScopedDeletionDelegatesExplicitMode(): void
+    {
+        $this->withBodyFormat('json')->post('/servers/srv-9/subscriptions/sub-1/delete', ['mode' => 'revoke'])->assertStatus(200);
+        $this->withBodyFormat('json')->post('/servers/srv-9/subscriptions/sub-2/delete', ['mode' => 'records-only'])->assertStatus(200);
+
+        $this->assertSame([['srv-9', 'sub-1', false], ['srv-9', 'sub-2', true]], $this->servers->deleteSubscriptionArgs);
+    }
+
+    public function testServerScopedDeletionRequiresExplicitMode(): void
+    {
+        $this->withBodyFormat('json')->post('/servers/srv-9/subscriptions/sub-1/delete', [])->assertStatus(422);
+        $this->assertSame([], $this->servers->deleteSubscriptionArgs);
+    }
+
+    public function testRevocationFailureReturnsDistinctJsonError(): void
+    {
+        $this->servers->deleteThrows = new \App\Libraries\OutlineRequestException('Outline offline');
+
+        $result = $this->withBodyFormat('json')->post('/servers/srv-9/subscriptions/sub-1/delete', ['mode' => 'revoke']);
+
+        $result->assertStatus(502);
+        $result->assertJSONFragment(['kind' => 'outline', 'error' => 'Outline offline']);
     }
 }

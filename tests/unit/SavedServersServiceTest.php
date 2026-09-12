@@ -55,6 +55,7 @@ final class FakeCockpitForSavedServers extends CockpitService
     public array $collections = [];
 
     public bool $createFails = false;
+    public bool $freshFails = false;
 
     public function createItem(string $model, array $data): ?array
     {
@@ -84,6 +85,19 @@ final class FakeCockpitForSavedServers extends CockpitService
     public function getCollectionCached(string $model, array $params = [], ?int $ttl = null): array
     {
         return $this->collections[$model] ?? $this->collection;
+    }
+
+    public function getCollectionFresh(string $model, array $params = []): array
+    {
+        if ($this->freshFails) {
+            throw new \RuntimeException('Cockpit read failed.');
+        }
+        $rows = $this->collections[$model] ?? $this->collection;
+        $serverId = $params['filter']['serverId'] ?? null;
+        return $serverId === null ? $rows : array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => ($row['serverId'] ?? null) === $serverId,
+        ));
     }
 }
 
@@ -219,6 +233,83 @@ final class SavedServersServiceTest extends CIUnitTestCase
     {
         $this->assertTrue($this->service->delete('srv-9'));
         $this->assertSame(['servers', 'srv-9'], $this->cockpit->deleteCalls[0]);
+    }
+
+    public function testDeletePreviewCountsAllStatusesAndFailsClosed(): void
+    {
+        $this->cockpit->collections['servers'] = [['_id' => 'srv-9']];
+        $this->cockpit->collections['subscriptions'] = [
+            ['_id' => 'a', 'serverId' => 'srv-9', 'status' => 'active'],
+            ['_id' => 'b', 'serverId' => 'srv-9', 'status' => 'expired'],
+            ['_id' => 'c', 'serverId' => 'other', 'status' => 'active'],
+        ];
+
+        $this->assertSame(['total' => 2, 'active' => 1, 'subscriptions' => [
+            ['id' => 'a', 'status' => 'active'],
+            ['id' => 'b', 'status' => 'expired'],
+        ]], $this->service->deletePreview('srv-9'));
+
+        $this->cockpit->freshFails = true;
+        $this->expectException(\RuntimeException::class);
+        $this->service->deleteWhenEmpty('srv-9');
+    }
+
+    public function testServerCannotBeDeletedWhileAnySubscriptionRemains(): void
+    {
+        $this->cockpit->collections['servers'] = [['_id' => 'srv-9']];
+        $this->cockpit->collections['subscriptions'] = [['_id' => 'b', 'serverId' => 'srv-9', 'status' => 'expired']];
+
+        try {
+            $this->service->deleteWhenEmpty('srv-9');
+            $this->fail('Expected remaining subscriptions to block deletion.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertSame('1 subscriptions still reference this server.', $e->getMessage());
+        }
+
+        $this->assertSame([], $this->cockpit->deleteCalls);
+    }
+
+    public function testRecordsOnlyDeletionNeverContactsOutline(): void
+    {
+        $this->cockpit->collections['servers'] = [['_id' => 'srv-9']];
+        $this->cockpit->collections['subscriptions'] = [['_id' => 'a', 'serverId' => 'srv-9', 'status' => 'active']];
+        $this->outline->reachable = false;
+        $subscriptions = new SubscriptionsService($this->cockpit, $this->service, $this->outline);
+        $service = new SavedServersService($this->cockpit, $this->outline, $subscriptions);
+
+        $this->assertTrue($service->deleteSubscriptionForServer('srv-9', 'a', true));
+        $this->assertSame([['subscriptions', 'a']], $this->cockpit->deleteCalls);
+        $this->assertSame([], $this->outline->listKeysCalledWith);
+    }
+
+    public function testNormalDeletionUsesOnlyARecordBelongingToTheServer(): void
+    {
+        $this->cockpit->collections['servers'] = [['_id' => 'srv-9']];
+        $this->cockpit->collections['subscriptions'] = [
+            ['_id' => 'a', 'serverId' => 'srv-9', 'status' => 'active'],
+            ['_id' => 'b', 'serverId' => 'other', 'status' => 'active'],
+        ];
+        $subscriptions = new class extends SubscriptionsService {
+            public array $deleted = [];
+            public function __construct() {}
+            public function deleteFromRecord(array $subscription): void { $this->deleted[] = $subscription['_id']; }
+        };
+        $service = new SavedServersService($this->cockpit, $this->outline, $subscriptions);
+
+        $this->assertFalse($service->deleteSubscriptionForServer('srv-9', 'b', false));
+        $this->assertTrue($service->deleteSubscriptionForServer('srv-9', 'a', false));
+        $this->assertSame(['a'], $subscriptions->deleted);
+    }
+
+    public function testDeleteWhenEmptyRemovesServerWithoutOutlineCall(): void
+    {
+        $this->cockpit->collections['servers'] = [['_id' => 'srv-9']];
+        $this->cockpit->collections['subscriptions'] = [];
+        $this->outline->reachable = false;
+
+        $this->assertTrue($this->service->deleteWhenEmpty('srv-9'));
+        $this->assertSame([['servers', 'srv-9']], $this->cockpit->deleteCalls);
+        $this->assertSame([], $this->outline->listKeysCalledWith);
     }
 
     public function testListDelegatesToGetCollectionCached(): void

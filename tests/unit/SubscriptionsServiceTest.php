@@ -688,6 +688,33 @@ final class SubscriptionsServiceTest extends CIUnitTestCase
         ];
     }
 
+    public function testDeleteAllowsInactiveServerAndAlreadyMissingKey(): void
+    {
+        $events = [];
+        $cockpit = new class($events) extends CockpitService {
+            public function __construct(private array &$events) {}
+            public function deleteItem(string $model, string $id): bool { $this->events[] = 'cockpit'; return true; }
+        };
+        $servers = new class extends SavedServersService {
+            public function __construct() {}
+            public function list(): array { return [['_id' => 'server', 'apiUrl' => 'https://outline.example/api', 'active' => false]]; }
+        };
+        $outline = new class($events) extends OutlineService {
+            public function __construct(private array &$events) {}
+            public function deleteKeyById(string $apiUrl, string $id): void
+            {
+                $this->events[] = 'outline';
+                throw new \App\Libraries\OutlineRequestException('already gone', notFound: true);
+            }
+        };
+
+        (new SubscriptionsService($cockpit, $servers, $outline))->deleteFromRecord([
+            '_id' => 'sub-1', 'serverId' => 'server', 'outlineKeyId' => 'key-1', 'status' => 'active',
+        ]);
+
+        $this->assertSame(['outline', 'cockpit'], $events);
+    }
+
     public function testGenerateTokenIsUrlSafeAndUniqueAcrossLargeSample(): void
     {
         $tokens = [];

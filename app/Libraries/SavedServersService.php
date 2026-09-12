@@ -132,6 +132,83 @@ class SavedServersService
     }
 
     /**
+     * Return a fresh snapshot for the delete confirmation. A Cockpit read
+     * failure throws rather than silently reporting zero subscriptions.
+     *
+     * @return array{total: int, active: int, subscriptions: array<int, array{id: string, status: string}>}
+     */
+    public function deletePreview(string $id): array
+    {
+        $records = $this->subscriptionsForDeletion($id);
+        $subscriptions = array_map(
+            static fn (array $record): array => [
+                'id' => (string) ($record['_id'] ?? ''),
+                'status' => (string) ($record['status'] ?? ''),
+            ],
+            $records,
+        );
+
+        foreach ($subscriptions as $subscription) {
+            if ($subscription['id'] === '') {
+                throw new \RuntimeException('Cockpit returned a subscription without an ID.');
+            }
+        }
+
+        return [
+            'total' => count($subscriptions),
+            'active' => count(array_filter($subscriptions, static fn (array $subscription): bool => $subscription['status'] === 'active')),
+            'subscriptions' => $subscriptions,
+        ];
+    }
+
+    /**
+     * Delete one subscription from a confirmed server-delete snapshot.
+     * Returns false when it has already been removed, making retries safe.
+     */
+    public function deleteSubscriptionForServer(string $serverId, string $subscriptionId, bool $recordsOnly): bool
+    {
+        $records = $this->subscriptionsForDeletion($serverId);
+        $matching = array_values(array_filter(
+            $records,
+            static fn (array $record): bool => ($record['_id'] ?? null) === $subscriptionId,
+        ));
+        if ($matching === []) {
+            return false;
+        }
+
+        if ($recordsOnly) {
+            if (!$this->subscriptions()->removeRecord($subscriptionId)) {
+                throw new \RuntimeException('Failed to delete the subscription from Cockpit.');
+            }
+        } else {
+            $this->subscriptions()->deleteFromRecord($matching[0]);
+        }
+
+        return true;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function subscriptionsForDeletion(string $serverId): array
+    {
+        $this->findServer($serverId);
+        return $this->cockpit->getCollectionFresh('subscriptions', ['filter' => ['serverId' => $serverId]]);
+    }
+
+    public function deleteWhenEmpty(string $id): bool
+    {
+        $snapshot = $this->deletePreview($id);
+        if ($snapshot['total'] > 0) {
+            throw new \InvalidArgumentException("{$snapshot['total']} subscriptions still reference this server.");
+        }
+
+        if (!$this->delete($id)) {
+            throw new \RuntimeException('Failed to delete the server from Cockpit.');
+        }
+
+        return true;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function list(): array

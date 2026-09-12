@@ -294,7 +294,10 @@ class OutlineService
         }
 
         if ($response['status'] < 200 || $response['status'] >= 300) {
-            throw new OutlineRequestException("Outline API returned HTTP {$response['status']}: {$response['body']}");
+            throw new OutlineRequestException(
+                "Outline API returned HTTP {$response['status']}: {$response['body']}",
+                notFound: $method === 'DELETE' && $response['status'] === 404,
+            );
         }
 
         if ($response['body'] === '') {
