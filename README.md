@@ -40,6 +40,105 @@ Run the test suite inside the `cli` container:
 docker compose exec cli vendor/bin/phpunit
 ```
 
+### Deploying on a VPS with Caddy and Cloudflare
+
+The Compose configuration bind-mounts the repository into the containers. On a
+fresh checkout, install Composer dependencies as the host user so that Composer
+can create `vendor/` without leaving root-owned files:
+
+```bash
+docker compose up -d
+docker compose exec \
+  --user "$(id -u):$(id -g)" \
+  -e COMPOSER_HOME=/tmp/composer \
+  cli composer install --no-dev --optimize-autoloader
+```
+
+Give the web container ownership of CodeIgniter's runtime directory:
+
+```bash
+WEB_UID=$(docker compose exec -T web id -u www-data)
+WEB_GID=$(docker compose exec -T web id -g www-data)
+sudo chown -R "$WEB_UID:$WEB_GID" writable
+sudo chmod -R u+rwX writable
+```
+
+Create `.env` and configure the public HTTPS URL and application secrets:
+
+```bash
+cp env .env
+```
+
+```env
+CI_ENVIRONMENT = production
+app.baseURL = 'https://vpn.example.com/'
+
+cockpit.apiUrl = 'https://cockpit.example.com'
+cockpit.apiToken = 'replace-with-your-token'
+adminaccess.password = 'replace-with-a-long-random-password'
+```
+
+Do not commit `.env`. Start or restart the application and verify it directly
+on the VPS before adding the reverse proxy:
+
+```bash
+docker compose restart web
+docker compose exec cli php spark cache:clear
+curl -I http://127.0.0.1:8080
+```
+
+Configure Caddy without an `http://` prefix so that automatic HTTPS remains
+enabled:
+
+```caddyfile
+vpn.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Validate and reload Caddy:
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+sudo journalctl -u caddy --since "10 minutes ago" --no-pager
+```
+
+Allow inbound TCP ports 80 and 443 through both the VPS firewall and any
+provider firewall. Port 8080 only needs to be reachable locally when Caddy runs
+on the same host.
+
+For a domain proxied through Cloudflare:
+
+1. Point the domain's `A` or `AAAA` record at the VPS.
+2. Set **SSL/TLS encryption mode** to **Full (strict)**. Do not use Flexible.
+3. Confirm **Universal SSL** is enabled and its edge certificate is active.
+4. Keep the DNS record proxied after Caddy has obtained its origin certificate.
+
+If Caddy cannot obtain a certificate while the Cloudflare proxy is enabled,
+temporarily change the DNS record to **DNS only**, reload Caddy, confirm HTTPS
+works, and then enable the proxy again.
+
+Useful production diagnostics:
+
+```bash
+docker compose ps
+docker compose logs --tail=200 web
+sudo ss -lntp | grep -E ':80|:443|:8080'
+curl -Iv https://vpn.example.com
+```
+
+The expected request path is:
+
+```text
+Browser --HTTPS--> Cloudflare --HTTPS--> Caddy --HTTP--> Docker :8080
+```
+
+If `spark` reports that `vendor/codeigniter4/framework/system/Boot.php` is
+missing, Composer dependencies have not been installed. If Composer says that
+`/var/www/html/vendor` cannot be created, repeat the UID/GID-aware Composer
+command above rather than running Composer as root.
+
 ### Option B — Local PHP
 
 ```bash
