@@ -10,6 +10,7 @@ services:
     environment:
       PHP_OPCACHE_ENABLE: "0"
       NGINX_WEBROOT: /var/www/html/public
+    restart: unless-stopped
 
   cli:
     build:
@@ -19,3 +20,4 @@ services:
       - ./:/var/www/html
     working_dir: /var/www/html
     command: ["tail", "-f", "/dev/null"]
+    restart: unless-stopped
